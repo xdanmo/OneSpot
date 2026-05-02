@@ -342,6 +342,8 @@ function renderFeed() {
     let isDragging = false;
     let startY = 0;
     let startX = 0;
+    let longPressTriggered = false;
+    let lastToggleTime = 0;
 
     // 1. Completely disable native right-click/long-press menus
     article.addEventListener('contextmenu', (e) => {
@@ -351,13 +353,14 @@ function renderFeed() {
     // 2. Measure exactly when and where the finger touches down
     article.addEventListener('pointerdown', (e) => {
       isDragging = false;
+      longPressTriggered = false;
       startY = e.clientY;
       startX = e.clientX;
       
       // Only start the long-press timer if we aren't already selecting things
       if (selectedIds.length === 0) {
         pressTimer = setTimeout(() => {
-          isDragging = true; // Mark it as used so pointerup ignores it
+          longPressTriggered = true;
           selectedIds = [item.id];
           if (navigator.vibrate) navigator.vibrate(50);
           updateSelectionState();
@@ -376,23 +379,24 @@ function renderFeed() {
     // 4. Handle what happens when the finger lifts (Replaces buggy click event)
     article.addEventListener('pointerup', (e) => {
       clearTimeout(pressTimer);
-      if (isDragging) return; // Ignore if they scrolled or if long-press already triggered
+      
+      if (isDragging) return; // Ignore if they scrolled
+      
+      // If long press just triggered, do nothing (selection was already handled by the timer)
+      if (longPressTriggered) {
+        longPressTriggered = false;
+        return;
+      }
 
+      // If we are currently in selection mode, seamlessly toggle the post ON LIFT
       if (selectedIds.length > 0) {
-        // Selection Mode is active: Just toggle the post
-        e.preventDefault();
+        lastToggleTime = Date.now(); // Mark when we toggled so 'click' ignores the tap immediately after
         if (selectedIds.includes(item.id)) {
           selectedIds = selectedIds.filter(id => id !== item.id);
         } else {
           selectedIds.push(item.id);
         }
         updateSelectionState();
-      } else {
-        // Normal Mode: If they tapped a link, let it open normally
-        if (e.target.closest('a')) return;
-        
-        // Otherwise, open the detail sheet
-        openDetailSheet(item);
       }
     });
 
@@ -404,10 +408,23 @@ function renderFeed() {
 
     // 6. Disable Safari's weird native click behavior to prevent double-firing
     article.addEventListener('click', (e) => {
+      // If we are currently in selection mode, block click
       if (selectedIds.length > 0) {
-        e.preventDefault(); // Stop links from working while in select mode
-      } else if (!e.target.closest('a')) {
-        e.preventDefault(); // Stop browser from routing card clicks
+        e.preventDefault();
+        return;
+      }
+      
+      // If we JUST toggled out of selection mode less than 300ms ago, block the click. 
+      // (This stops the Detail Sheet from opening immediately after deselecting the final item)
+      if (Date.now() - lastToggleTime < 300) {
+        e.preventDefault();
+        return;
+      }
+
+      // Normal Mode: Allow native link clicks to open in a new tab, but intercept card clicks to open Detail Sheet
+      if (!e.target.closest('a')) {
+        e.preventDefault();
+        openDetailSheet(item);
       }
     });
 
