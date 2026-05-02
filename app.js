@@ -10,7 +10,6 @@ let dataFileId = null;
 
 let entries = [];
 let selectedIds = [];
-let pressTimer = null;
 let isInitialRender = true;
 
 // DOM Elements
@@ -338,48 +337,77 @@ function renderFeed() {
         </div>`;
     }
 
-    // --- EVENTS ---
-    let longPressTriggered = false;
-    const cancelPress = () => clearTimeout(pressTimer);
+    // --- BULLETPROOF INTERACTION EVENTS ---
+    let pressTimer = null;
+    let isDragging = false;
+    let startY = 0;
+    let startX = 0;
 
+    // 1. Completely disable native right-click/long-press menus
     article.addEventListener('contextmenu', (e) => {
       e.preventDefault();
     });
 
-    article.addEventListener('pointerdown', () => {
-      // FIX: Ensure this resets on EVERY tap so the first post can be deselected later
-      longPressTriggered = false;
+    // 2. Measure exactly when and where the finger touches down
+    article.addEventListener('pointerdown', (e) => {
+      isDragging = false;
+      startY = e.clientY;
+      startX = e.clientX;
       
+      // Only start the long-press timer if we aren't already selecting things
       if (selectedIds.length === 0) {
         pressTimer = setTimeout(() => {
-          longPressTriggered = true;
+          isDragging = true; // Mark it as used so pointerup ignores it
           selectedIds = [item.id];
           if (navigator.vibrate) navigator.vibrate(50);
           updateSelectionState();
         }, 500);
       }
     });
-    
-    article.addEventListener('pointerup', cancelPress);
-    article.addEventListener('pointerleave', cancelPress);
-    article.addEventListener('pointercancel', cancelPress);
-    
-    article.addEventListener('click', (e) => {
-      cancelPress();
-      
-      if (longPressTriggered) { 
-        e.preventDefault(); 
-        longPressTriggered = false; // Double protection reset
-        return; 
+
+    // 3. Cancel the tap if the user is scrolling
+    article.addEventListener('pointermove', (e) => {
+      if (Math.abs(e.clientY - startY) > 10 || Math.abs(e.clientX - startX) > 10) {
+        isDragging = true;
+        clearTimeout(pressTimer);
       }
-      
+    });
+
+    // 4. Handle what happens when the finger lifts (Replaces buggy click event)
+    article.addEventListener('pointerup', (e) => {
+      clearTimeout(pressTimer);
+      if (isDragging) return; // Ignore if they scrolled or if long-press already triggered
+
       if (selectedIds.length > 0) {
+        // Selection Mode is active: Just toggle the post
         e.preventDefault();
-        if (selectedIds.includes(item.id)) selectedIds = selectedIds.filter(id => id !== item.id);
-        else selectedIds.push(item.id);
+        if (selectedIds.includes(item.id)) {
+          selectedIds = selectedIds.filter(id => id !== item.id);
+        } else {
+          selectedIds.push(item.id);
+        }
         updateSelectionState();
       } else {
+        // Normal Mode: If they tapped a link, let it open normally
+        if (e.target.closest('a')) return;
+        
+        // Otherwise, open the detail sheet
         openDetailSheet(item);
+      }
+    });
+
+    // 5. Cleanup if touch gets interrupted by the OS
+    article.addEventListener('pointercancel', () => {
+      isDragging = true;
+      clearTimeout(pressTimer);
+    });
+
+    // 6. Disable Safari's weird native click behavior to prevent double-firing
+    article.addEventListener('click', (e) => {
+      if (selectedIds.length > 0) {
+        e.preventDefault(); // Stop links from working while in select mode
+      } else if (!e.target.closest('a')) {
+        e.preventDefault(); // Stop browser from routing card clicks
       }
     });
 
