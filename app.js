@@ -259,13 +259,13 @@ function renderFeed() {
     itemDiv.className = 'masonry-item';
     
     // Check if image is a Google Drive image
-    let driveId = null;
     let imgSource = item.image;
     if (item.image) {
       const match = item.image.match(/id=([^&]+)/) || item.image.match(/drive_id:(.+)/);
       if (match) {
-        driveId = match[1];
-        imgSource = 'data:image/gif;base64,R0lGODlhAQABAIAAAP///wAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw=='; // transparent pixel placeholder
+        const driveId = match[1];
+        // Use Google's official thumbnail generator to bypass CORS and hotlink blocking
+        imgSource = `https://drive.google.com/thumbnail?id=${driveId}&sz=w1000`;
       }
     }
     
@@ -287,7 +287,7 @@ function renderFeed() {
         <article class="${selectedIds.length === 0 ? 'card-hover' : ''}" 
           style="position: relative; background-color: transparent; border-radius: var(--rounded-xl); cursor: pointer; transform: ${isSelected ? 'scale(0.95)' : 'scale(1)'}; opacity: ${(selectedIds.length > 0 && !isSelected) ? 0.6 : 1}; transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s, border 0.3s; display: block; width: 100%;">
           <div class="shadow-ambient" style="position: relative; width: 100%; padding-bottom: ${item.aspectRatio}; background-color: var(--surface-container-low); overflow: hidden; border-radius: var(--rounded-xl); transform: translateZ(0); -webkit-mask-image: -webkit-radial-gradient(white, black);">
-            <img src="${imgSource}" data-drive-id="${driveId || ''}" alt="${item.title}" class="img-hover" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover;" />
+            <img src="${imgSource}" alt="${item.title}" class="img-hover" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover;" />
             ${isSelected ? '<div style="position: absolute; inset: 0; z-index: 30; background-color: rgba(0,0,0,0.4); border-radius: inherit; pointer-events: none;"></div>' : ''}
             <div style="position: absolute; bottom: 0; left: 0; width: 100%; padding: 32px 12px 12px; background: linear-gradient(to bottom, transparent, rgba(0,0,0,0.7)); display: flex; flex-direction: column; gap: 6px; z-index: 2; pointer-events: none;">
               ${item.url ? `<a href="https://${item.url.replace(/^https?:\/\//, '')}" target="_blank" class="font-body-md" style="display: flex; align-items: center; gap: 4px; color: rgba(255,255,255,0.9); text-decoration: none; font-size: 12px; pointer-events: ${selectedIds.length > 0 ? 'none' : 'auto'};"><span class="material-symbols-outlined" style="font-size: 14px;">link</span>${item.url}</a>` : ''}
@@ -301,23 +301,6 @@ function renderFeed() {
     }
     
     itemDiv.innerHTML = html;
-    
-    // Securely fetch drive image
-    if (driveId && !item.localImageUrl) {
-      const imgEl = itemDiv.querySelector('img');
-      fetch(`https://www.googleapis.com/drive/v3/files/${driveId}?alt=media`, {
-        headers: { 'Authorization': 'Bearer ' + gapi.client.getToken().access_token }
-      })
-      .then(res => res.blob())
-      .then(blob => {
-        item.localImageUrl = URL.createObjectURL(blob);
-        imgEl.src = item.localImageUrl;
-      })
-      .catch(err => console.error("Error loading image", err));
-    } else if (item.localImageUrl) {
-      const imgEl = itemDiv.querySelector('img');
-      imgEl.src = item.localImageUrl;
-    }
     
     // Events
     const article = itemDiv.querySelector('article');
@@ -374,7 +357,12 @@ function updateSelectionState() {
 function openDetailSheet(item) {
   let imgHtml = '';
   if (item.image) {
-    const sheetImgSource = item.localImageUrl || item.image;
+    let sheetImgSource = item.image;
+    const match = item.image.match(/id=([^&]+)/) || item.image.match(/drive_id:(.+)/);
+    if (match) {
+      sheetImgSource = `https://drive.google.com/thumbnail?id=${match[1]}&sz=w1000`;
+    }
+    
     imgHtml = `
       <div style="margin-bottom: 20px; width: 100%; display: flex; justify-content: center;">
         <div style="border-radius: var(--rounded-xl); overflow: hidden; transform: translateZ(0); -webkit-mask-image: -webkit-radial-gradient(white, black); display: inline-block; background-color: var(--surface-container-low); max-width: 100%;">
