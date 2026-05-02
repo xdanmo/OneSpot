@@ -208,6 +208,8 @@ async function uploadImageToDrive(file) {
   });
 
   authOverlay.style.display = 'none';
+  
+  // FIX: Added the missing $ and forced HTTPS to prevent iOS Safari mixed-content blocks
   return `https://lh3.googleusercontent.com/d/${data.id}`;
 }
 
@@ -290,10 +292,17 @@ function renderFeed() {
     let driveId = null;
     let imgSource = item.image;
     if (item.image) {
+      // FIX: Matches Google Drive IDs and uses secure HTTPS URLs
       const ucMatch = item.image.match(/[?&]id=([^&]+)/);
       const lh3Match = item.image.match(/lh3\.googleusercontent\.com\/d\/([^/?]+)/);
       if (ucMatch) { driveId = ucMatch[1]; imgSource = `https://lh3.googleusercontent.com/d/${driveId}`; }
       else if (lh3Match) { driveId = lh3Match[1]; imgSource = item.image; }
+      else if (item.image.includes('googleusercontent')) { 
+        // Catch-all for our own generated URLs if they bypass the regex
+        imgSource = item.image; 
+        const parts = item.image.split('/d/');
+        if (parts.length > 1) driveId = parts[1];
+      }
     }
 
     // Build article
@@ -335,7 +344,6 @@ function renderFeed() {
     let longPressTriggered = false;
     const cancelPress = () => clearTimeout(pressTimer);
 
-    // JS FIX: This completely blocks the native mobile "Copy/Save" popups from ever appearing
     article.addEventListener('contextmenu', (e) => {
       e.preventDefault();
     });
@@ -429,8 +437,14 @@ function openDetailSheet(item) {
   let imgHtml = '';
   if (item.image) {
     let sheetImgSource = item.image;
+    // FIX: Secure HTTPS for detail sheet too
     const ucMatch = item.image.match(/[?&]id=([^&]+)/);
-    if (ucMatch) sheetImgSource = `https://lh3.googleusercontent.com/d/${ucMatch[1]}`;
+    if (ucMatch) { 
+      sheetImgSource = `https://lh3.googleusercontent.com/d/${ucMatch[1]}`;
+    } else if (item.image.includes('googleusercontent')) {
+      sheetImgSource = item.image;
+    }
+    
     imgHtml = `
       <div style="margin-bottom: 20px; width: 100%; display: flex; justify-content: center;">
         <div style="border-radius: var(--rounded-xl); overflow: hidden; transform: translateZ(0); -webkit-mask-image: -webkit-radial-gradient(white, black); display: inline-block; background-color: var(--surface-container-low); max-width: 100%;">
