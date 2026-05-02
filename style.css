@@ -161,43 +161,36 @@ input {
 
 /* Masonry Grid */
 .masonry-grid {
-  column-count: 2;
-  column-gap: 12px;
-  column-fill: auto;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  align-items: start;
   width: 100%;
 }
 .masonry-item {
-  break-inside: avoid;
-  page-break-inside: avoid;
-  -webkit-column-break-inside: avoid;
-  padding-bottom: 12px;
   display: block;
   width: 100%;
-  transform: translateZ(0);
   overflow: hidden;
 }
 @media (min-width: 600px) {
   .masonry-grid {
-    column-count: 3;
-    column-gap: 16px;
-  }
-  .masonry-item {
-    padding-bottom: 16px;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
   }
 }
 @media (min-width: 900px) {
   .masonry-grid {
-    column-count: 4;
+    grid-template-columns: repeat(4, 1fr);
   }
 }
 @media (min-width: 1200px) {
   .masonry-grid {
-    column-count: 5;
+    grid-template-columns: repeat(5, 1fr);
   }
 }
 @media (min-width: 1600px) {
   .masonry-grid {
-    column-count: 6;
+    grid-template-columns: repeat(6, 1fr);
   }
 }
 
