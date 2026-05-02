@@ -35,6 +35,39 @@ const detailBackdrop = document.getElementById('detail-backdrop');
 const detailContent = document.getElementById('detail-content');
 const btnSheetClose = document.getElementById('btn-sheet-close');
 
+// --- Global Error Handler for Images ---
+window.handleImageError = async function(img) {
+  if (img.dataset.retried === '1') return;
+  img.dataset.retried = '1';
+
+  const driveId = img.dataset.driveId;
+
+  // If it's an old corrupted post with the literal '{data.id}' typo, just hide the broken icon
+  if (!driveId || driveId.includes('{data.id}')) {
+    img.style.opacity = '0';
+    return;
+  }
+
+  // Fallback: Try fetching securely through the authenticated Google Drive API
+  try {
+    const token = gapi.client.getToken();
+    if (!token || !token.access_token) throw new Error("No token");
+
+    const res = await fetch(`https://www.googleapis.com/drive/v3/files/${driveId}?alt=media`, {
+      headers: { 'Authorization': 'Bearer ' + token.access_token }
+    });
+
+    if (!res.ok) throw new Error('Fetch failed');
+
+    const blob = await res.blob();
+    img.src = URL.createObjectURL(blob);
+    img.style.opacity = '1';
+  } catch (e) {
+    // If fallback totally fails, hide the broken icon so the card stays clean
+    img.style.opacity = '0';
+  }
+};
+
 // --- Google Drive Initialization ---
 window.onload = function () {
   gapi.load('client', initGoogleDriveClient);
@@ -327,7 +360,7 @@ function renderFeed() {
       article.innerHTML = `
         <div class="shadow-ambient" style="position:relative;width:100%;padding-bottom:${safeRatio};background-color:var(--surface-container-low);overflow:hidden;border-radius:var(--rounded-xl);transform:translateZ(0);-webkit-mask-image:-webkit-radial-gradient(white,black);">
           <img src="${imgSource}" data-drive-id="${driveId || ''}" alt="" class="img-hover" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover; pointer-events:none;"
-            onerror="if(this.dataset.driveId&&!this.dataset.retried){this.dataset.retried='1';fetch('https://www.googleapis.com/drive/v3/files/'+this.dataset.driveId+'?alt=media',{headers:{'Authorization':'Bearer '+gapi.client.getToken().access_token}}).then(r=>r.blob()).then(b=>{this.src=URL.createObjectURL(b)}).catch(()=>{})}" />
+            onerror="window.handleImageError(this)" />
           <div style="position:absolute;bottom:0;left:0;width:100%;padding:32px 12px 12px;display:flex;flex-direction:column;gap:6px;z-index:2;pointer-events:none;">
             ${item.url ? `<a href="https://${item.url.replace(/^https?:\/\//, '')}" target="_blank" style="display:flex;align-items:center;gap:4px;color:rgba(255,255,255,0.95);text-decoration:none;font-size:12px;text-shadow:0 1px 4px rgba(0,0,0,0.8), 0 0 10px rgba(0,0,0,0.5);"><span class="material-symbols-outlined" style="font-size:14px;">link</span>${item.url}</a>` : ''}
           </div>
@@ -345,19 +378,16 @@ function renderFeed() {
     let longPressTriggered = false;
     let lastToggleTime = 0;
 
-    // 1. Completely disable native right-click/long-press menus
     article.addEventListener('contextmenu', (e) => {
       e.preventDefault();
     });
 
-    // 2. Measure exactly when and where the finger touches down
     article.addEventListener('pointerdown', (e) => {
       isDragging = false;
       longPressTriggered = false;
       startY = e.clientY;
       startX = e.clientX;
       
-      // Only start the long-press timer if we aren't already selecting things
       if (selectedIds.length === 0) {
         pressTimer = setTimeout(() => {
           longPressTriggered = true;
@@ -368,7 +398,6 @@ function renderFeed() {
       }
     });
 
-    // 3. Cancel the tap if the user is scrolling
     article.addEventListener('pointermove', (e) => {
       if (Math.abs(e.clientY - startY) > 10 || Math.abs(e.clientX - startX) > 10) {
         isDragging = true;
@@ -376,21 +405,17 @@ function renderFeed() {
       }
     });
 
-    // 4. Handle what happens when the finger lifts (Replaces buggy click event)
     article.addEventListener('pointerup', (e) => {
       clearTimeout(pressTimer);
+      if (isDragging) return; 
       
-      if (isDragging) return; // Ignore if they scrolled
-      
-      // If long press just triggered, do nothing (selection was already handled by the timer)
       if (longPressTriggered) {
         longPressTriggered = false;
         return;
       }
 
-      // If we are currently in selection mode, seamlessly toggle the post ON LIFT
       if (selectedIds.length > 0) {
-        lastToggleTime = Date.now(); // Mark when we toggled so 'click' ignores the tap immediately after
+        lastToggleTime = Date.now(); 
         if (selectedIds.includes(item.id)) {
           selectedIds = selectedIds.filter(id => id !== item.id);
         } else {
@@ -400,28 +425,22 @@ function renderFeed() {
       }
     });
 
-    // 5. Cleanup if touch gets interrupted by the OS
     article.addEventListener('pointercancel', () => {
       isDragging = true;
       clearTimeout(pressTimer);
     });
 
-    // 6. Disable Safari's weird native click behavior to prevent double-firing
     article.addEventListener('click', (e) => {
-      // If we are currently in selection mode, block click
       if (selectedIds.length > 0) {
         e.preventDefault();
         return;
       }
       
-      // If we JUST toggled out of selection mode less than 300ms ago, block the click. 
-      // (This stops the Detail Sheet from opening immediately after deselecting the final item)
       if (Date.now() - lastToggleTime < 300) {
         e.preventDefault();
         return;
       }
 
-      // Normal Mode: Allow native link clicks to open in a new tab, but intercept card clicks to open Detail Sheet
       if (!e.target.closest('a')) {
         e.preventDefault();
         openDetailSheet(item);
@@ -488,17 +507,26 @@ function openDetailSheet(item) {
   let imgHtml = '';
   if (item.image) {
     let sheetImgSource = item.image;
+    let driveId = '';
+    
+    // Safely extract driveId for the detail sheet fallback
     const ucMatch = item.image.match(/[?&]id=([^&]+)/);
+    const lh3Match = item.image.match(/lh3\.googleusercontent\.com\/d\/([^/?]+)/);
     if (ucMatch) { 
-      sheetImgSource = `https://googleusercontent.com/profile/picture/0${ucMatch[1]}`;
+      driveId = ucMatch[1];
+      sheetImgSource = `https://googleusercontent.com/profile/picture/0${driveId}`;
+    } else if (lh3Match) {
+      driveId = lh3Match[1];
     } else if (item.image.includes('googleusercontent')) {
       sheetImgSource = item.image;
+      const parts = item.image.split('/0');
+      if (parts.length > 1) driveId = parts[1];
     }
     
     imgHtml = `
       <div style="margin-bottom: 20px; width: 100%; display: flex; justify-content: center;">
         <div style="border-radius: var(--rounded-xl); overflow: hidden; transform: translateZ(0); -webkit-mask-image: -webkit-radial-gradient(white, black); display: inline-block; background-color: var(--surface-container-low); max-width: 100%;">
-          <img src="${sheetImgSource}" data-drive-id="${ucMatch ? ucMatch[1] : ''}" alt="" style="display: block; max-height: 40vh; max-width: 100%; width: auto; height: auto;" onerror="if(this.dataset.driveId && !this.dataset.retried){this.dataset.retried='1';fetch('https://www.googleapis.com/drive/v3/files/'+this.dataset.driveId+'?alt=media',{headers:{'Authorization':'Bearer '+gapi.client.getToken().access_token}}).then(r=>r.blob()).then(b=>{this.src=URL.createObjectURL(b)}).catch(()=>{})}" />
+          <img src="${sheetImgSource}" data-drive-id="${driveId}" alt="" style="display: block; max-height: 40vh; max-width: 100%; width: auto; height: auto;" onerror="window.handleImageError(this)" />
         </div>
       </div>
     `;
