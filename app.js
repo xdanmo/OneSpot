@@ -119,7 +119,11 @@ async function initializeDrive() {
       dataFileId = res.result.files[0].id;
       // Fetch content
       const fileRes = await gapi.client.drive.files.get({ fileId: dataFileId, alt: 'media' });
-      if (fileRes.body) {
+      
+      // Handle auto-parsed JSON vs raw body string
+      if (fileRes.result && typeof fileRes.result === 'object') {
+        entries = Array.isArray(fileRes.result) ? fileRes.result : [];
+      } else if (fileRes.body) {
         try { entries = JSON.parse(fileRes.body); } catch (e) { entries = []; }
       }
     } else {
@@ -257,7 +261,11 @@ function setMasonrySpans() {
   const gap = parseInt(window.getComputedStyle(grid).columnGap) || 12;
   document.querySelectorAll('.masonry-item').forEach(item => {
     item.style.gridRowEnd = '';
-    const height = item.getBoundingClientRect().height;
+    
+    // Measure the inner article (children[0]) to get the true content height
+    const child = item.children[0];
+    const height = child ? child.getBoundingClientRect().height : 0;
+    
     const spans = Math.ceil((height + gap) / (rowSize + gap));
     item.style.gridRowEnd = `span ${spans}`;
   });
