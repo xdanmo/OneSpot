@@ -318,10 +318,9 @@ function renderFeed() {
       
       const safeRatio = (item.aspectRatio && item.aspectRatio !== 'NaN%') ? item.aspectRatio : '100%';
       
-      // Removed the linear-gradient from the bottom div here
       article.innerHTML = `
         <div class="shadow-ambient" style="position:relative;width:100%;padding-bottom:${safeRatio};background-color:var(--surface-container-low);overflow:hidden;border-radius:var(--rounded-xl);transform:translateZ(0);-webkit-mask-image:-webkit-radial-gradient(white,black);">
-          <img src="${imgSource}" data-drive-id="${driveId || ''}" alt="" class="img-hover" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;"
+          <img src="${imgSource}" data-drive-id="${driveId || ''}" alt="" class="img-hover" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover; pointer-events:none;"
             onerror="if(this.dataset.driveId&&!this.dataset.retried){this.dataset.retried='1';fetch('https://www.googleapis.com/drive/v3/files/'+this.dataset.driveId+'?alt=media',{headers:{'Authorization':'Bearer '+gapi.client.getToken().access_token}}).then(r=>r.blob()).then(b=>{this.src=URL.createObjectURL(b)}).catch(()=>{})}" />
           <div style="position:absolute;bottom:0;left:0;width:100%;padding:32px 12px 12px;display:flex;flex-direction:column;gap:6px;z-index:2;pointer-events:none;">
             ${item.url ? `<a href="https://${item.url.replace(/^https?:\/\//, '')}" target="_blank" style="display:flex;align-items:center;gap:4px;color:rgba(255,255,255,0.95);text-decoration:none;font-size:12px;text-shadow:0 1px 4px rgba(0,0,0,0.8), 0 0 10px rgba(0,0,0,0.5);"><span class="material-symbols-outlined" style="font-size:14px;">link</span>${item.url}</a>` : ''}
@@ -332,9 +331,14 @@ function renderFeed() {
         </div>`;
     }
 
-    // Events
+    // --- EVENTS ---
     let longPressTriggered = false;
     const cancelPress = () => clearTimeout(pressTimer);
+
+    // JS FIX: This completely blocks the native mobile "Copy/Save" popups from ever appearing
+    article.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+    });
 
     article.addEventListener('pointerdown', () => {
       if (selectedIds.length === 0) {
@@ -347,9 +351,11 @@ function renderFeed() {
         }, 500);
       }
     });
+    
     article.addEventListener('pointerup', cancelPress);
     article.addEventListener('pointerleave', cancelPress);
     article.addEventListener('pointercancel', cancelPress);
+    
     article.addEventListener('click', (e) => {
       cancelPress();
       if (longPressTriggered) { e.preventDefault(); return; }
