@@ -11,6 +11,7 @@ let dataFileId = null;
 let entries = [];
 let selectedIds = [];
 let isInitialRender = true;
+let lastSelectionTime = 0;
 
 // DOM Elements
 const authOverlay = document.getElementById('auth-overlay');
@@ -39,23 +40,27 @@ const btnSheetClose = document.getElementById('btn-sheet-close');
 window.handleImageError = async function(img) {
   if (img.dataset.retried === '1') return;
   img.dataset.retried = '1';
+
   const driveId = img.dataset.driveId;
+
   if (!driveId || driveId.includes('{data.id}')) {
-    img.style.display = 'none';
+    img.style.display = 'none'; // Hide completely if it's an old broken post
     return;
   }
+
   try {
     const token = gapi.client.getToken();
-    if (!token) return;
+    if (!token || !token.access_token) throw new Error("No token");
+
     const res = await fetch(`https://www.googleapis.com/drive/v3/files/${driveId}?alt=media`, {
       headers: { 'Authorization': 'Bearer ' + token.access_token }
     });
-    if (res.ok) {
-      const blob = await res.blob();
-      img.src = URL.createObjectURL(blob);
-    } else {
-      img.style.display = 'none';
-    }
+
+    if (!res.ok) throw new Error('Fetch failed');
+
+    const blob = await res.blob();
+    img.src = URL.createObjectURL(blob);
+    img.style.display = 'block';
   } catch (e) {
     img.style.display = 'none';
   }
@@ -68,11 +73,16 @@ window.onload = function () {
     client_id: CLIENT_ID,
     scope: SCOPES,
     callback: async (response) => {
-      if (response.error !== undefined) throw (response);
+      if (response.error !== undefined) {
+        throw (response);
+      }
+
+      // Save token to prevent logout on refresh
       const tokenInfo = Object.assign({}, response, {
         expires_at: Date.now() + (response.expires_in * 1000)
       });
       localStorage.setItem('onespot_token', JSON.stringify(tokenInfo));
+
       authOverlay.style.display = 'none';
       await initializeDrive();
     },
@@ -102,6 +112,7 @@ function maybeEnableButtons() {
         localStorage.removeItem('onespot_token');
       }
     }
+
     authStatus.style.display = 'none';
     btnLogin.style.display = 'block';
   }
@@ -113,7 +124,10 @@ btnLogin.onclick = () => {
 
 async function initializeDrive() {
   authStatus.style.display = 'block';
-  authStatus.textContent = 'Syncing...';
+  authStatus.textContent = 'Syncing with Drive...';
+  btnLogin.style.display = 'none';
+  authOverlay.style.display = 'flex';
+
   try {
     let q = "name='OneSpot' and mimeType='application/vnd.google-apps.folder' and trashed=false";
     let res = await gapi.client.drive.files.list({ q: q, spaces: 'drive' });
@@ -126,11 +140,13 @@ async function initializeDrive() {
       });
       folderId = res.result.id;
     }
+
     q = `name='data.json' and '${folderId}' in parents and trashed=false`;
     res = await gapi.client.drive.files.list({ q: q, spaces: 'drive' });
     if (res.result.files.length > 0) {
       dataFileId = res.result.files[0].id;
       const fileRes = await gapi.client.drive.files.get({ fileId: dataFileId, alt: 'media' });
+      
       if (fileRes.result && typeof fileRes.result === 'object') {
         entries = Array.isArray(fileRes.result) ? fileRes.result : [];
       } else if (fileRes.body) {
@@ -142,6 +158,7 @@ async function initializeDrive() {
       const form = new FormData();
       form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
       form.append('file', file);
+
       const createRes = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
         method: 'POST',
         headers: { 'Authorization': 'Bearer ' + gapi.client.getToken().access_token },
@@ -150,9 +167,35 @@ async function initializeDrive() {
       const data = await createRes.json();
       dataFileId = data.id;
     }
+
+    const aboutRes = await gapi.client.drive.about.get({ fields: 'user' });
+    if (aboutRes.result.user) {
+      const user = aboutRes.result.user;
+      document.getElementById('profile-name').textContent = user.displayName || 'User';
+      document.getElementById('profile-email').textContent = user.emailAddress || '';
+      if (user.photoLink) {
+        let photoUrl = user.photoLink;
+        if (photoUrl.startsWith('//')) photoUrl = 'https:' + photoUrl;
+        const img = document.getElementById('profile-image');
+        img.src = photoUrl;
+        img.style.display = 'block';
+        document.getElementById('profile-placeholder').style.display = 'none';
+      }
+    }
+
   } catch (err) {
-    console.error('Drive Error:', err);
+    console.error('Drive API Error:', err);
+    if (err.status === 401 || (err.result && err.result.error && err.result.error.code === 401)) {
+      localStorage.removeItem('onespot_token');
+      authStatus.style.display = 'none';
+      btnLogin.style.display = 'block';
+      authOverlay.style.display = 'flex';
+      return;
+    } else {
+      alert('Failed to connect to Drive. Check console.');
+    }
   }
+
   authOverlay.style.display = 'none';
   renderFeed();
 }
@@ -167,30 +210,99 @@ async function saveDataToDrive() {
 }
 
 async function uploadImageToDrive(file) {
+  authOverlay.style.display = 'flex';
+  authStatus.textContent = 'Uploading image...';
+  authStatus.style.display = 'block';
+
   const metadata = { name: file.name, parents: [folderId] };
   const form = new FormData();
   form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
   form.append('file', file);
-  const res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id', {
+
+  const createRes = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id', {
     method: 'POST',
     headers: { 'Authorization': 'Bearer ' + gapi.client.getToken().access_token },
     body: form
   });
   const data = await createRes.json();
+
+  await gapi.client.drive.permissions.create({
+    fileId: data.id,
+    resource: { type: 'anyone', role: 'reader' }
+  });
+
+  authOverlay.style.display = 'none';
+  
   return `https://googleusercontent.com/profile/picture/0${data.id}`;
 }
 
-// --- Layout & Logic ---
+
+// --- Routing ---
+function handleRoute() {
+  const hash = window.location.hash.replace('#', '') || '/';
+  Object.values(views).forEach(v => v.style.display = 'none');
+  if (views[hash]) views[hash].style.display = 'block';
+  else views['/'].style.display = 'block';
+  updateNavIndicator(hash);
+}
+
+function updateNavIndicator(hash) {
+  let activeIndex = 0;
+  if (hash.startsWith('/profile')) activeIndex = 1;
+  if (hash.startsWith('/add')) activeIndex = 2;
+
+  navLinks.forEach((link, idx) => {
+    if (idx === activeIndex) {
+      link.style.color = 'var(--on-primary)';
+      link.style.transform = 'scale(1.1)';
+    } else {
+      link.style.color = 'var(--outline)';
+      link.style.transform = 'scale(1)';
+    }
+  });
+
+  const activeLink = navLinks[activeIndex];
+  if (activeLink && navIndicator) {
+    navIndicator.style.left = activeLink.offsetLeft + 'px';
+    navIndicator.style.top = activeLink.offsetTop + 'px';
+    navIndicator.style.width = activeLink.offsetWidth + 'px';
+    navIndicator.style.height = activeLink.offsetHeight + 'px';
+    navIndicator.style.opacity = '1';
+
+    if (isInitialRender) {
+      navIndicator.style.transition = 'none';
+      setTimeout(() => {
+        isInitialRender = false;
+        navIndicator.style.transition = 'all 0.5s ease';
+      }, 50);
+    }
+  }
+}
+
+// --- Masonry Row Spanning ---
 function setMasonrySpans() {
-  const rowSize = 4;
+  const rowSize = 4; // MUST match grid-auto-rows in style.css
+
   document.querySelectorAll('.masonry-item').forEach(item => {
-    item.style.gridRowEnd = ''; 
+    item.style.gridRowEnd = ''; // Reset to flow naturally
+    
     const article = item.children[0];
     if (!article) return;
+    
     const contentHeight = article.getBoundingClientRect().height;
-    const spans = Math.ceil((contentHeight + 12) / rowSize);
+    const marginBottom = parseFloat(window.getComputedStyle(item).marginBottom) || 12;
+    
+    const spans = Math.ceil((contentHeight + marginBottom) / rowSize);
     item.style.gridRowEnd = `span ${spans}`;
   });
+}
+
+// --- Rendering ---
+// Debouncer function for image loads to prevent layout thrashing
+let masonryTimeout = null;
+function scheduleMasonryUpdate() {
+  clearTimeout(masonryTimeout);
+  masonryTimeout = setTimeout(setMasonrySpans, 100);
 }
 
 function renderFeed() {
@@ -198,50 +310,151 @@ function renderFeed() {
   entries.forEach(item => {
     const itemDiv = document.createElement('div');
     itemDiv.className = 'masonry-item';
-    let driveId = '';
+
+    // Resolve image source
+    let driveId = null;
+    let imgSource = item.image;
     if (item.image) {
-      const match = item.image.match(/d\/([^/?]+)/) || item.image.match(/picture\/0([^/?]+)/);
-      if (match) driveId = match[1];
+      const ucMatch = item.image.match(/[?&]id=([^&]+)/);
+      const lh3Match = item.image.match(/lh3\.googleusercontent\.com\/d\/([^/?]+)/);
+      if (ucMatch) { driveId = ucMatch[1]; imgSource = `https://googleusercontent.com/profile/picture/0${driveId}`; }
+      else if (lh3Match) { driveId = lh3Match[1]; imgSource = item.image; }
+      else if (item.image.includes('googleusercontent')) { 
+        imgSource = item.image; 
+        const parts = item.image.split('/0');
+        if (parts.length > 1) driveId = parts[1];
+      }
     }
+
+    // Build article
     const article = document.createElement('article');
     article.dataset.id = item.id;
     article.className = 'card-hover';
-    article.style.cssText = 'display:block;width:100%;cursor:pointer;border-radius:var(--rounded-xl);position:relative;';
+    article.style.cssText = 'display:block;width:100%;cursor:pointer;border-radius:var(--rounded-xl);transform:scale(1);opacity:1;transition:transform 0.3s cubic-bezier(0.34,1.56,0.64,1),opacity 0.3s;position:relative;';
+
     if (!item.image) {
-      article.innerHTML = `<div class="shadow-ambient" style="background-color:var(--surface-container-low);color:var(--on-surface);padding:var(--spacing-md);border:1px solid var(--tertiary-fixed-dim);border-radius:inherit;"><h2 class="font-headline-md">${item.title}</h2></div>`;
+      article.classList.add('shadow-ambient');
+      article.style.backgroundColor = 'var(--surface-container-low)';
+      article.style.color = 'var(--on-surface)';
+      article.style.padding = 'var(--spacing-md)';
+      article.style.border = '1px solid var(--tertiary-fixed-dim)';
+      article.innerHTML = `
+        <div style="display:flex;flex-direction:column;gap:var(--spacing-md);">
+          <h2 class="font-headline-md" style="line-height:1.3;word-break:break-word;font-size:clamp(14px,4.5vw,24px);">${item.title}</h2>
+          ${item.url ? `<a href="https://${item.url.replace(/^https?:\/\//, '')}" target="_blank" class="font-body-md" style="display:block;margin-top:var(--spacing-sm);color:var(--outline);text-decoration:underline;">${item.url}</a>` : ''}
+        </div>`;
     } else {
-      article.innerHTML = `<div class="shadow-ambient" style="position:relative;width:100%;padding-bottom:${item.aspectRatio || '100%'};background-color:var(--surface-container-low);overflow:hidden;border-radius:var(--rounded-xl);"><img src="${item.image}" data-drive-id="${driveId}" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;pointer-events:none;" onerror="window.handleImageError(this)" /></div><div style="padding:8px 4px 0;"><h2 class="font-headline-md" style="font-size:14px;">${item.title}</h2></div>`;
+      article.style.backgroundColor = 'transparent';
+      
+      const safeRatio = (item.aspectRatio && item.aspectRatio !== 'NaN%') ? item.aspectRatio : '100%';
+      
+      article.innerHTML = `
+        <div class="shadow-ambient" style="position:relative;width:100%;padding-bottom:${safeRatio};background-color:var(--surface-container-low);overflow:hidden;border-radius:var(--rounded-xl);transform:translateZ(0);-webkit-mask-image:-webkit-radial-gradient(white,black);">
+          <img src="${imgSource}" data-drive-id="${driveId || ''}" alt="" class="img-hover" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover; pointer-events:none;"
+            onerror="window.handleImageError(this)" />
+          <div style="position:absolute;bottom:0;left:0;width:100%;padding:32px 12px 12px;display:flex;flex-direction:column;gap:6px;z-index:2;pointer-events:none;">
+            ${item.url ? `<a href="https://${item.url.replace(/^https?:\/\//, '')}" target="_blank" style="display:flex;align-items:center;gap:4px;color:rgba(255,255,255,0.95);text-decoration:none;font-size:12px;text-shadow:0 1px 4px rgba(0,0,0,0.8), 0 0 10px rgba(0,0,0,0.5);"><span class="material-symbols-outlined" style="font-size:14px;">link</span>${item.url}</a>` : ''}
+          </div>
+        </div>
+        <div style="padding:6px 8px 0;">
+          <h2 class="font-headline-md" style="color:var(--on-background);display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden;font-size:14px;line-height:1.2;">${item.title}</h2>
+        </div>`;
     }
 
-    let timer = null;
-    let moved = false;
-    article.addEventListener('touchstart', (e) => {
-      moved = false;
+    // --- BULLETPROOF INTERACTION EVENTS ---
+    let pressTimer = null;
+    let startY = 0;
+    let startX = 0;
+
+    article.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+    });
+
+    article.addEventListener('pointerdown', (e) => {
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
+      startY = e.clientY;
+      startX = e.clientX;
+      
       if (selectedIds.length === 0) {
-        timer = setTimeout(() => {
-          moved = true;
+        pressTimer = setTimeout(() => {
           selectedIds = [item.id];
+          lastSelectionTime = Date.now();
+          if (navigator.vibrate) navigator.vibrate(50);
           updateSelectionState();
-        }, 600);
+        }, 500);
       }
-    }, { passive: true });
-    article.addEventListener('touchmove', () => { clearTimeout(timer); moved = true; }, { passive: true });
+    });
+
+    article.addEventListener('pointermove', (e) => {
+      if (Math.abs(e.clientY - startY) > 10 || Math.abs(e.clientX - startX) > 10) {
+        clearTimeout(pressTimer);
+      }
+    });
+
+    article.addEventListener('pointerup', () => clearTimeout(pressTimer));
+    article.addEventListener('pointercancel', () => clearTimeout(pressTimer));
+
     article.addEventListener('click', (e) => {
-      clearTimeout(timer);
-      if (moved) return;
+      e.preventDefault(); 
+      
       if (selectedIds.length > 0) {
-        e.preventDefault();
-        selectedIds = selectedIds.includes(item.id) ? selectedIds.filter(id => id !== item.id) : [...selectedIds, item.id];
+        if (Date.now() - lastSelectionTime < 300) return;
+        
+        if (selectedIds.includes(item.id)) {
+          selectedIds = selectedIds.filter(id => id !== item.id);
+        } else {
+          selectedIds.push(item.id);
+        }
         updateSelectionState();
       } else {
+        const link = e.target.closest('a');
+        if (link) {
+          window.open(link.href, link.target || '_blank');
+          return;
+        }
         openDetailSheet(item);
       }
     });
+
     itemDiv.appendChild(article);
     feedGrid.appendChild(itemDiv);
   });
+
   applySelectionStyles();
-  setTimeout(setMasonrySpans, 200);
+
+  requestAnimationFrame(() => {
+    setMasonrySpans();
+    feedGrid.querySelectorAll('img').forEach(img => {
+      if (!img.complete) {
+        img.addEventListener('load', scheduleMasonryUpdate, { once: true });
+        img.addEventListener('error', scheduleMasonryUpdate, { once: true });
+      }
+    });
+  });
+}
+
+function applySelectionStyles() {
+  const inSelectionMode = selectedIds.length > 0;
+  document.querySelectorAll('article[data-id]').forEach(article => {
+    const id = article.dataset.id;
+    const isSelected = selectedIds.includes(id);
+
+    article.style.transform = isSelected ? 'scale(0.95)' : 'scale(1)';
+    article.style.opacity = (inSelectionMode && !isSelected) ? '0.6' : '1';
+
+    if (inSelectionMode) article.classList.remove('card-hover');
+    else article.classList.add('card-hover');
+
+    let overlay = article.querySelector('.sel-overlay');
+    if (isSelected && !overlay) {
+      overlay = document.createElement('div');
+      overlay.className = 'sel-overlay';
+      overlay.style.cssText = 'position:absolute;inset:0;z-index:30;background:rgba(0,0,0,0.4);border-radius:inherit;pointer-events:none;';
+      article.prepend(overlay);
+    } else if (!isSelected && overlay) {
+      overlay.remove();
+    }
+  });
 }
 
 function updateSelectionState() {
@@ -250,69 +463,339 @@ function updateSelectionState() {
     bottomNav.style.display = 'none';
     selectionBar.style.display = 'flex';
     selectionCount.textContent = `${selectedIds.length} Selected`;
+    const btnEdit = document.getElementById('btn-edit');
+    if (btnEdit) btnEdit.style.display = selectedIds.length === 1 ? 'block' : 'none';
   } else {
     bottomNav.style.display = 'flex';
     selectionBar.style.display = 'none';
-    // FIX: Force recalculate indicator position when navigation bar returns
-    setTimeout(() => updateNavIndicator(window.location.hash.replace('#', '') || '/'), 50);
+    
+    // FIX: Give the browser enough time to finish drawing the flexbox layout 
+    // before we try to measure the icon's exact coordinates for the black dot.
+    setTimeout(() => {
+      requestAnimationFrame(() => {
+        updateNavIndicator(window.location.hash.replace('#', '') || '/');
+      });
+    }, 150);
   }
 }
 
-function applySelectionStyles() {
-  const inMode = selectedIds.length > 0;
-  document.querySelectorAll('article[data-id]').forEach(art => {
-    const isSel = selectedIds.includes(art.dataset.id);
-    art.style.transform = isSel ? 'scale(0.95)' : 'scale(1)';
-    art.style.opacity = (inMode && !isSel) ? '0.6' : '1';
-    let ov = art.querySelector('.sel-overlay');
-    if (isSel && !ov) {
-      ov = document.createElement('div');
-      ov.className = 'sel-overlay';
-      ov.style.cssText = 'position:absolute;inset:0;background:rgba(0,0,0,0.3);border-radius:inherit;z-index:10;pointer-events:none;';
-      art.appendChild(ov);
-    } else if (!isSel && ov) ov.remove();
-  });
-}
-
-// --- Navigation & Routing ---
-function handleRoute() {
-  const hash = window.location.hash.replace('#', '') || '/';
-  Object.values(views).forEach(v => v.style.display = 'none');
-  if (views[hash]) views[hash].style.display = 'block';
-  updateNavIndicator(hash);
-}
-
-function updateNavIndicator(hash) {
-  let activeIndex = 0;
-  if (hash.startsWith('/profile')) activeIndex = 1;
-  if (hash.startsWith('/add')) activeIndex = 2;
-  const activeLink = navLinks[activeIndex];
-  if (activeLink && navIndicator) {
-    navIndicator.style.left = activeLink.offsetLeft + 'px';
-    navIndicator.style.width = activeLink.offsetWidth + 'px';
-    navIndicator.style.height = activeLink.offsetHeight + 'px';
-    navIndicator.style.opacity = '1';
-  }
-}
-
+// --- Detail Sheet ---
 function openDetailSheet(item) {
-  detailContent.innerHTML = `<h1 style="font-size:22px;margin-bottom:12px;">${item.title}</h1>`;
-  detailBackdrop.style.opacity = '1';
-  detailBackdrop.style.pointerEvents = 'auto';
-  detailSheet.style.transform = 'translateY(0)';
+  let imgHtml = '';
+  if (item.image) {
+    let sheetImgSource = item.image;
+    let driveId = '';
+    
+    const ucMatch = item.image.match(/[?&]id=([^&]+)/);
+    const lh3Match = item.image.match(/lh3\.googleusercontent\.com\/d\/([^/?]+)/);
+    if (ucMatch) { 
+      driveId = ucMatch[1];
+      sheetImgSource = `https://googleusercontent.com/profile/picture/0${driveId}`;
+    } else if (lh3Match) {
+      driveId = lh3Match[1];
+    } else if (item.image.includes('googleusercontent')) {
+      sheetImgSource = item.image;
+      const parts = item.image.split('/0');
+      if (parts.length > 1) driveId = parts[1];
+    }
+    
+    imgHtml = `
+      <div style="margin-bottom: 20px; width: 100%; display: flex; justify-content: center;">
+        <div style="border-radius: var(--rounded-xl); overflow: hidden; transform: translateZ(0); -webkit-mask-image: -webkit-radial-gradient(white, black); display: inline-block; background-color: var(--surface-container-low); max-width: 100%;">
+          <img src="${sheetImgSource}" data-drive-id="${driveId}" alt="" style="display: block; max-height: 40vh; max-width: 100%; width: auto; height: auto;" onerror="window.handleImageError(this)" />
+        </div>
+      </div>
+    `;
+  }
+
+  detailContent.innerHTML = `
+    ${imgHtml}
+    <h1 style="font-family: var(--font-family); font-size: 22px; font-weight: 600; line-height: 1.3; color: var(--on-surface); margin-bottom: 12px; word-break: break-word;">${item.title}</h1>
+    ${item.url ? `<a href="https://${item.url.replace(/^https?:\/\//, '')}" target="_blank" style="display: inline-flex; align-items: center; gap: 6px; color: var(--outline); text-decoration: none; font-size: 14px; margin-bottom: 20px;"><span class="material-symbols-outlined" style="font-size: 16px;">open_in_new</span>${item.url}</a>` : ''}
+    ${item.tags ? `<div style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px;">${item.tags.map(tag => `<span class="font-label-sm" style="background-color: var(--surface-container-high); color: var(--on-surface-variant); padding: 6px 14px; border-radius: 9999px; font-size: 13px;">${tag}</span>`).join('')}</div>` : ''}
+  `;
+
   document.body.style.overflow = 'hidden';
+  detailBackdrop.style.pointerEvents = 'auto';
+  detailBackdrop.style.opacity = '1';
+  detailSheet.style.transform = 'translateY(0)';
 }
 
 function closeDetailSheet() {
   detailBackdrop.style.opacity = '0';
-  detailBackdrop.style.pointerEvents = 'none';
   detailSheet.style.transform = 'translateY(100%)';
-  document.body.style.overflow = '';
+  detailBackdrop.style.pointerEvents = 'none';
+  setTimeout(() => { document.body.style.overflow = ''; }, 300);
 }
 
+
+// --- Add Entry Logic ---
+const availableTags = ['Design', 'Interior', 'Art', 'Tech', 'Cooking', 'Travel', 'Minimalism', 'Architecture', 'Photography'];
+let addTags = [];
+let addImageUrl = '';
+let addImageAspectRatio = '100%';
+let pendingImageFile = null;
+
+const addText = document.getElementById('add-text');
+const addLink = document.getElementById('add-link');
+const addImage = document.getElementById('add-image');
+const addImageFile = document.getElementById('add-image-file');
+const addPreviewContainer = document.getElementById('add-preview-container');
+const tagsContainer = document.getElementById('tags-container');
+const btnSaveEntry = document.getElementById('btn-save-entry');
+
+function renderAddPreview() {
+  const text = addText.value || 'Preview';
+  const link = addLink.value;
+  let html = '';
+
+  if (!addImageUrl) {
+    html = `
+      <article class="shadow-ambient" style="position: relative; background-color: var(--surface-container-low); color: var(--on-surface); border-radius: var(--rounded-xl); padding: var(--spacing-md); border: 1px solid var(--tertiary-fixed-dim); transform: translateZ(0); -webkit-mask-image: -webkit-radial-gradient(white, black);">
+        <div>
+          <h2 class="font-headline-md" style="line-height: 1.3; word-break: break-word; font-size: clamp(14px, 4.5vw, 24px);">${text}</h2>
+          ${link ? `<a href="https://${link.replace(/^https?:\/\//, '')}" target="_blank" class="font-body-md" style="display: block; margin-top: var(--spacing-sm); color: var(--outline); word-break: break-all; text-decoration: underline; pointer-events: none;">${link}</a>` : ''}
+        </div>
+      </article>
+    `;
+  } else {
+    html = `
+      <article style="position: relative; background-color: transparent; border-radius: var(--rounded-xl); border: none;">
+        <div class="shadow-ambient" style="position: relative; width: 100%; padding-bottom: ${addImageAspectRatio}; background-color: var(--surface-container-low);">
+          <img src="${addImageUrl}" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; border-radius: var(--rounded-xl);" />
+          <div style="position: absolute; bottom: 0; left: 0; width: 100%; padding: 32px 12px 12px; display: flex; flex-direction: column; gap: 6px; z-index: 2;">
+            ${link ? `<div class="font-body-md" style="display: flex; align-items: center; gap: 4px; color: rgba(255,255,255,0.95); font-size: 12px; text-shadow: 0 1px 4px rgba(0,0,0,0.8), 0 0 10px rgba(0,0,0,0.5);"><span class="material-symbols-outlined" style="font-size: 14px;">link</span>${link.replace(/^https?:\/\//, '')}</div>` : ''}
+          </div>
+        </div>
+        <div style="padding: 6px 8px 0; display: flex; flex-direction: column;">
+          <h2 class="font-headline-md" style="color: var(--on-background); display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; font-size: 14px; line-height: 1.2;">${text}</h2>
+        </div>
+      </article>
+    `;
+  }
+  addPreviewContainer.innerHTML = html;
+}
+
+let isAddingTag = false;
+
+function renderTags() {
+  tagsContainer.innerHTML = '';
+  availableTags.forEach(tag => {
+    const isSelected = addTags.includes(tag);
+    const el = document.createElement('div');
+    el.className = 'font-label-sm';
+    el.textContent = tag;
+    el.style.backgroundColor = isSelected ? 'var(--tertiary)' : 'var(--surface-container)';
+    el.style.color = isSelected ? 'var(--on-tertiary)' : 'var(--on-surface)';
+    el.style.border = isSelected ? '1px solid var(--tertiary)' : '1px solid var(--tertiary-fixed-dim)';
+    el.style.borderRadius = 'var(--rounded-full)';
+    el.style.padding = '8px 16px';
+    el.style.cursor = 'pointer';
+    el.style.transition = 'all 0.2s';
+    el.style.boxShadow = isSelected ? '0 10px 20px rgba(0,0,0,0.05)' : 'none';
+    el.onclick = () => {
+      if (isSelected) addTags = addTags.filter(t => t !== tag);
+      else addTags.push(tag);
+      renderTags();
+    };
+    tagsContainer.appendChild(el);
+  });
+
+  if (isAddingTag) {
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.placeholder = 'Tag name...';
+    input.className = 'font-label-sm';
+    input.style.backgroundColor = 'var(--surface-container-highest)';
+    input.style.border = '1px solid var(--primary)';
+    input.style.color = 'var(--on-surface)';
+    input.style.borderRadius = 'var(--rounded-full)';
+    input.style.padding = '8px 16px';
+    input.style.outline = 'none';
+    input.style.width = '120px';
+
+    const saveTag = () => {
+      const val = input.value.trim();
+      if (val && !availableTags.includes(val)) {
+        availableTags.push(val);
+        addTags.push(val);
+      } else if (val && availableTags.includes(val) && !addTags.includes(val)) {
+        addTags.push(val);
+      }
+      isAddingTag = false;
+      renderTags();
+    };
+
+    input.onkeydown = (e) => {
+      if (e.key === 'Enter') saveTag();
+      else if (e.key === 'Escape') {
+        isAddingTag = false;
+        renderTags();
+      }
+    };
+    input.onblur = saveTag;
+    tagsContainer.appendChild(input);
+    input.focus();
+  } else {
+    const btn = document.createElement('button');
+    btn.className = 'font-label-sm';
+    btn.style.display = 'flex';
+    btn.style.alignItems = 'center';
+    btn.style.gap = 'var(--spacing-unit)';
+    btn.style.backgroundColor = 'var(--surface-container-low)';
+    btn.style.border = '1px dashed var(--outline-variant)';
+    btn.style.color = 'var(--on-surface-variant)';
+    btn.style.borderRadius = 'var(--rounded-full)';
+    btn.style.padding = '8px 16px';
+    btn.style.transition = 'all 0.2s';
+    btn.style.cursor = 'pointer';
+    btn.innerHTML = `<span class="material-symbols-outlined" style="font-size: 16px;">add</span> Add Tag`;
+    btn.onmouseover = () => { btn.style.borderColor = 'var(--outline)'; btn.style.color = 'var(--on-surface)'; };
+    btn.onmouseout = () => { btn.style.borderColor = 'var(--outline-variant)'; btn.style.color = 'var(--on-surface-variant)'; };
+    btn.onclick = () => { isAddingTag = true; renderTags(); };
+    tagsContainer.appendChild(btn);
+  }
+}
+
+addText.addEventListener('input', renderAddPreview);
+addLink.addEventListener('input', renderAddPreview);
+
+addImage.addEventListener('input', (e) => {
+  addImageUrl = e.target.value;
+  pendingImageFile = null;
+  if (addImageUrl) {
+    const img = new Image();
+    img.onload = () => {
+      addImageAspectRatio = ((img.height / img.width) * 100).toFixed(2) + '%';
+      renderAddPreview();
+    };
+    img.src = addImageUrl;
+  } else {
+    renderAddPreview();
+  }
+});
+
+addImageFile.addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (file) {
+    pendingImageFile = file;
+    const reader = new FileReader();
+    reader.onload = () => {
+      addImageUrl = reader.result;
+      addImage.value = file.name;
+      const img = new Image();
+      img.onload = () => {
+        addImageAspectRatio = ((img.height / img.width) * 100).toFixed(2) + '%';
+        renderAddPreview();
+      };
+      img.src = addImageUrl;
+    };
+    reader.readAsDataURL(file);
+  }
+});
+
+btnSaveEntry.addEventListener('click', async () => {
+  if (!addText.value.trim()) return;
+
+  let finalImageUrl = addImageUrl;
+
+  if (pendingImageFile) {
+    finalImageUrl = await uploadImageToDrive(pendingImageFile);
+  }
+
+  entries.unshift({
+    id: Date.now().toString(),
+    title: addText.value,
+    url: addLink.value,
+    image: finalImageUrl,
+    aspectRatio: addImageAspectRatio,
+    tags: [...addTags],
+    type: addTags[0] || 'Note'
+  });
+
+  await saveDataToDrive();
+
+  addText.value = '';
+  addLink.value = '';
+  addImage.value = '';
+  addImageUrl = '';
+  pendingImageFile = null;
+  addTags = [];
+  renderAddPreview();
+  renderTags();
+
+  window.location.hash = '#/';
+  renderFeed();
+});
+
+renderAddPreview();
+renderTags();
+
+// --- Bind Global Events ---
 window.addEventListener('hashchange', handleRoute);
+
+let lastWindowWidth = window.innerWidth;
+let resizeTimer;
+
+window.addEventListener('resize', () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => {
+    updateNavIndicator(window.location.hash.replace('#', '') || '/');
+    if (window.innerWidth !== lastWindowWidth) {
+      lastWindowWidth = window.innerWidth;
+      setMasonrySpans();
+    }
+  }, 150);
+});
+
+btnDelete.addEventListener('click', async () => {
+  authOverlay.style.display = 'flex';
+  authStatus.textContent = 'Deleting from Drive...';
+  authStatus.style.display = 'block';
+
+  const entriesToDelete = entries.filter(e => selectedIds.includes(e.id));
+  for (const item of entriesToDelete) {
+    if (item.image) {
+      const match = item.image.match(/id=([^&]+)/) || item.image.match(/drive_id:(.+)/);
+      if (match) {
+        const driveId = match[1];
+        try {
+          const delRes = await fetch(`https://www.googleapis.com/drive/v3/files/${driveId}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': 'Bearer ' + gapi.client.getToken().access_token }
+          });
+          if (!delRes.ok) {
+            console.error("Failed to delete image, status:", delRes.status);
+          }
+        } catch (e) {
+          console.error("Error deleting image from Drive:", e);
+        }
+      }
+    }
+  }
+
+  entries = entries.filter(e => !selectedIds.includes(e.id));
+  selectedIds = [];
+
+  await saveDataToDrive();
+
+  authOverlay.style.display = 'none';
+  renderFeed();
+  updateSelectionState();
+});
+
+btnCloseSelection.addEventListener('click', () => {
+  selectedIds = [];
+  updateSelectionState();
+});
+
 detailBackdrop.addEventListener('click', closeDetailSheet);
 btnSheetClose.addEventListener('click', closeDetailSheet);
-btnCloseSelection.addEventListener('click', () => { selectedIds = []; updateSelectionState(); });
+
+document.getElementById('btn-logout').addEventListener('click', () => {
+  localStorage.removeItem('onespot_token');
+  window.location.hash = '#/';
+  window.location.reload();
+});
 
 handleRoute();
