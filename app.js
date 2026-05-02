@@ -204,7 +204,7 @@ async function uploadImageToDrive(file) {
   });
   
   authOverlay.style.display = 'none';
-  return `https://drive.google.com/uc?id=${data.id}`;
+  return `https://lh3.googleusercontent.com/d/${data.id}`;
 }
 
 
@@ -262,10 +262,15 @@ function renderFeed() {
     let driveId = null;
     let imgSource = item.image;
     if (item.image) {
-      const match = item.image.match(/id=([^&]+)/) || item.image.match(/drive_id:(.+)/);
-      if (match) {
-        driveId = match[1];
-        imgSource = 'data:image/gif;base64,R0lGODlhAQABAIAAAP///wAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw=='; // transparent pixel placeholder
+      // Support legacy uc?id= URLs and new lh3 URLs
+      const ucMatch = item.image.match(/[?&]id=([^&]+)/);
+      const lh3Match = item.image.match(/lh3\.googleusercontent\.com\/d\/([^/?]+)/);
+      if (ucMatch) {
+        driveId = ucMatch[1];
+        imgSource = `https://lh3.googleusercontent.com/d/${driveId}`;
+      } else if (lh3Match) {
+        driveId = lh3Match[1];
+        imgSource = item.image;
       }
     }
     
@@ -302,22 +307,7 @@ function renderFeed() {
     
     itemDiv.innerHTML = html;
     
-    // Securely fetch drive image
-    if (driveId && !item.localImageUrl) {
-      const imgEl = itemDiv.querySelector('img');
-      fetch(`https://www.googleapis.com/drive/v3/files/${driveId}?alt=media`, {
-        headers: { 'Authorization': 'Bearer ' + gapi.client.getToken().access_token }
-      })
-      .then(res => res.blob())
-      .then(blob => {
-        item.localImageUrl = URL.createObjectURL(blob);
-        imgEl.src = item.localImageUrl;
-      })
-      .catch(err => console.error("Error loading image", err));
-    } else if (item.localImageUrl) {
-      const imgEl = itemDiv.querySelector('img');
-      imgEl.src = item.localImageUrl;
-    }
+    // Images are public and load directly via lh3.googleusercontent.com
     
     // Events
     const article = itemDiv.querySelector('article');
@@ -374,7 +364,9 @@ function updateSelectionState() {
 function openDetailSheet(item) {
   let imgHtml = '';
   if (item.image) {
-    const sheetImgSource = item.localImageUrl || item.image;
+    let sheetImgSource = item.image;
+    const ucMatch = item.image.match(/[?&]id=([^&]+)/);
+    if (ucMatch) sheetImgSource = `https://lh3.googleusercontent.com/d/${ucMatch[1]}`;
     imgHtml = `
       <div style="margin-bottom: 20px; width: 100%; display: flex; justify-content: center;">
         <div style="border-radius: var(--rounded-xl); overflow: hidden; transform: translateZ(0); -webkit-mask-image: -webkit-radial-gradient(white, black); display: inline-block; background-color: var(--surface-container-low); max-width: 100%;">
