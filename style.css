@@ -78,13 +78,11 @@
   box-sizing: border-box;
 }
 
-/* FIX: Apply touch overrides globally to all interactive elements */
 html, body, *, a, button, article, .nav-link, .card-hover, .masonry-item {
   -webkit-tap-highlight-color: rgba(0, 0, 0, 0) !important;
   -webkit-tap-highlight-color: transparent !important;
 }
 
-/* FIX: Prevent Safari from opening "Save Image" or "Copy Text" menus anywhere unless it's a typing input */
 body {
   -webkit-touch-callout: none !important; 
   -webkit-user-select: none !important;   
@@ -93,7 +91,6 @@ body {
   user-select: none !important;           
 }
 
-/* But allow the user to actually type in the Add post inputs! */
 input, textarea {
   -webkit-user-select: auto !important;
   user-select: auto !important;
@@ -236,6 +233,27 @@ input {
 /* Card Hover & Mobile Select Prevention Effects */
 .card-hover {
   transition: transform 0.3s ease, box-shadow 0.3s ease !important;
+}
+
+/* FIX: Force ALL text and containers inside the cards to be 100% unselectable. 
+   This stops the text from highlighting when you long-press the image above it. 
+*/
+.card-hover * {
+  -webkit-touch-callout: none !important; 
+  -webkit-user-select: none !important;   
+  -moz-user-select: none !important;      
+  -ms-user-select: none !important;       
+  user-select: none !important;           
+}
+
+/* FIX: Ensure that even if the browser somehow selects the text, the highlight color is invisible */
+.card-hover ::selection {
+  background: transparent !important;
+  color: inherit !important;
+}
+.card-hover ::-moz-selection {
+  background: transparent !important;
+  color: inherit !important;
 }
 
 /* Prevent image dragging while trying to long-press or scroll */
