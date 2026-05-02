@@ -76,8 +76,27 @@
   margin: 0;
   padding: 0;
   box-sizing: border-box;
-  /* Removes the ugly blue tap highlight on mobile devices */
-  -webkit-tap-highlight-color: transparent; 
+}
+
+/* FIX: Apply touch overrides globally to all interactive elements */
+html, body, *, a, button, article, .nav-link, .card-hover, .masonry-item {
+  -webkit-tap-highlight-color: rgba(0, 0, 0, 0) !important;
+  -webkit-tap-highlight-color: transparent !important;
+}
+
+/* FIX: Prevent Safari from opening "Save Image" or "Copy Text" menus anywhere unless it's a typing input */
+body {
+  -webkit-touch-callout: none !important; 
+  -webkit-user-select: none !important;   
+  -moz-user-select: none !important;      
+  -ms-user-select: none !important;       
+  user-select: none !important;           
+}
+
+/* But allow the user to actually type in the Add post inputs! */
+input, textarea {
+  -webkit-user-select: auto !important;
+  user-select: auto !important;
 }
 
 html,
@@ -99,6 +118,7 @@ body {
 a {
   text-decoration: none;
   color: inherit;
+  outline: none;
 }
 
 ul {
@@ -216,18 +236,12 @@ input {
 /* Card Hover & Mobile Select Prevention Effects */
 .card-hover {
   transition: transform 0.3s ease, box-shadow 0.3s ease !important;
-  
-  /* FIX: Stop mobile browsers from popping up text copy/image save menus on long press */
-  -webkit-touch-callout: none; /* iOS Safari */
-  -webkit-user-select: none;   /* Safari */
-  -moz-user-select: none;      /* Firefox */
-  -ms-user-select: none;       /* IE/Edge */
-  user-select: none;           /* Standard */
 }
 
 /* Prevent image dragging while trying to long-press or scroll */
 .card-hover img {
-  -webkit-user-drag: none;
+  -webkit-user-drag: none !important;
+  pointer-events: none; /* Let the card handle all clicks/touches, ignore the actual image */
 }
 
 .card-hover:hover {
