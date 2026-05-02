@@ -261,19 +261,13 @@ function setMasonrySpans() {
   document.querySelectorAll('.masonry-item').forEach(item => {
     item.style.gridRowEnd = ''; // Reset to flow naturally
     
-    // Measure the actual inner content <article> to avoid grid-clipping measuring errors
     const article = item.children[0];
     if (!article) return;
     
     const contentHeight = article.getBoundingClientRect().height;
-    
-    // Get the dynamic margin-bottom applied by CSS (12px on mobile, 16px on desktop)
     const marginBottom = parseFloat(window.getComputedStyle(item).marginBottom) || 12;
     
-    // THE MATHEMATICAL FIX: 
-    // Since CSS grid row-gap is 0, each span is exactly 'rowSize' (4px). 
     const spans = Math.ceil((contentHeight + marginBottom) / rowSize);
-    
     item.style.gridRowEnd = `span ${spans}`;
   });
 }
@@ -322,15 +316,15 @@ function renderFeed() {
     } else {
       article.style.backgroundColor = 'transparent';
       
-      // Fallback against undefined or corrupt 'NaN%' aspect ratios
       const safeRatio = (item.aspectRatio && item.aspectRatio !== 'NaN%') ? item.aspectRatio : '100%';
       
+      // Removed the linear-gradient from the bottom div here
       article.innerHTML = `
         <div class="shadow-ambient" style="position:relative;width:100%;padding-bottom:${safeRatio};background-color:var(--surface-container-low);overflow:hidden;border-radius:var(--rounded-xl);transform:translateZ(0);-webkit-mask-image:-webkit-radial-gradient(white,black);">
           <img src="${imgSource}" data-drive-id="${driveId || ''}" alt="" class="img-hover" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;"
             onerror="if(this.dataset.driveId&&!this.dataset.retried){this.dataset.retried='1';fetch('https://www.googleapis.com/drive/v3/files/'+this.dataset.driveId+'?alt=media',{headers:{'Authorization':'Bearer '+gapi.client.getToken().access_token}}).then(r=>r.blob()).then(b=>{this.src=URL.createObjectURL(b)}).catch(()=>{})}" />
-          <div style="position:absolute;bottom:0;left:0;width:100%;padding:32px 12px 12px;background:linear-gradient(to bottom,transparent,rgba(0,0,0,0.7));display:flex;flex-direction:column;gap:6px;z-index:2;pointer-events:none;">
-            ${item.url ? `<a href="https://${item.url.replace(/^https?:\/\//, '')}" target="_blank" style="display:flex;align-items:center;gap:4px;color:rgba(255,255,255,0.9);text-decoration:none;font-size:12px;"><span class="material-symbols-outlined" style="font-size:14px;">link</span>${item.url}</a>` : ''}
+          <div style="position:absolute;bottom:0;left:0;width:100%;padding:32px 12px 12px;display:flex;flex-direction:column;gap:6px;z-index:2;pointer-events:none;">
+            ${item.url ? `<a href="https://${item.url.replace(/^https?:\/\//, '')}" target="_blank" style="display:flex;align-items:center;gap:4px;color:rgba(255,255,255,0.95);text-decoration:none;font-size:12px;text-shadow:0 1px 4px rgba(0,0,0,0.8), 0 0 10px rgba(0,0,0,0.5);"><span class="material-symbols-outlined" style="font-size:14px;">link</span>${item.url}</a>` : ''}
           </div>
         </div>
         <div style="padding:6px 8px 0;">
@@ -375,10 +369,8 @@ function renderFeed() {
 
   applySelectionStyles();
 
-  // Apply row spans after paint so heights are known
   requestAnimationFrame(() => {
     setMasonrySpans();
-    // Re-run safely after images load to correct spans
     feedGrid.querySelectorAll('img').forEach(img => {
       if (!img.complete) {
         img.addEventListener('load', scheduleMasonryUpdate, { once: true });
@@ -388,7 +380,7 @@ function renderFeed() {
   });
 }
 
-// Updates card visuals in-place — no DOM rebuild, no glitch
+// Updates card visuals in-place
 function applySelectionStyles() {
   const inSelectionMode = selectedIds.length > 0;
   document.querySelectorAll('article[data-id]').forEach(article => {
@@ -401,7 +393,6 @@ function applySelectionStyles() {
     if (inSelectionMode) article.classList.remove('card-hover');
     else article.classList.add('card-hover');
 
-    // Manage dark overlay for selected state
     let overlay = article.querySelector('.sel-overlay');
     if (isSelected && !overlay) {
       overlay = document.createElement('div');
@@ -498,8 +489,8 @@ function renderAddPreview() {
       <article style="position: relative; background-color: transparent; border-radius: var(--rounded-xl); border: none;">
         <div class="shadow-ambient" style="position: relative; width: 100%; padding-bottom: ${addImageAspectRatio}; background-color: var(--surface-container-low);">
           <img src="${addImageUrl}" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; border-radius: var(--rounded-xl);" />
-          <div style="position: absolute; bottom: 0; left: 0; width: 100%; padding: 32px 12px 12px; background: linear-gradient(to bottom, transparent, rgba(0,0,0,0.7)); display: flex; flex-direction: column; gap: 6px; z-index: 2;">
-            ${link ? `<div class="font-body-md" style="display: flex; align-items: center; gap: 4px; color: rgba(255,255,255,0.9); font-size: 12px; text-shadow: 0 1px 2px rgba(0,0,0,0.5);"><span class="material-symbols-outlined" style="font-size: 14px;">link</span>${link.replace(/^https?:\/\//, '')}</div>` : ''}
+          <div style="position: absolute; bottom: 0; left: 0; width: 100%; padding: 32px 12px 12px; display: flex; flex-direction: column; gap: 6px; z-index: 2;">
+            ${link ? `<div class="font-body-md" style="display: flex; align-items: center; gap: 4px; color: rgba(255,255,255,0.95); font-size: 12px; text-shadow: 0 1px 4px rgba(0,0,0,0.8), 0 0 10px rgba(0,0,0,0.5);"><span class="material-symbols-outlined" style="font-size: 14px;">link</span>${link.replace(/^https?:\/\//, '')}</div>` : ''}
           </div>
         </div>
         <div style="padding: 6px 8px 0; display: flex; flex-direction: column;">
@@ -674,7 +665,6 @@ renderTags();
 // --- Bind Global Events ---
 window.addEventListener('hashchange', handleRoute);
 
-// Fix for mobile scroll glitch: Debounce resize and check if width actually changed
 let lastWindowWidth = window.innerWidth;
 let resizeTimer;
 
@@ -682,9 +672,6 @@ window.addEventListener('resize', () => {
   clearTimeout(resizeTimer);
   resizeTimer = setTimeout(() => {
     updateNavIndicator(window.location.hash.replace('#', '') || '/');
-    
-    // Only recalculate Masonry if the screen WIDTH changes (e.g. rotating device).
-    // This stops the browser from freezing when the mobile address bar hides on scroll!
     if (window.innerWidth !== lastWindowWidth) {
       lastWindowWidth = window.innerWidth;
       setMasonrySpans();
@@ -697,7 +684,6 @@ btnDelete.addEventListener('click', async () => {
   authStatus.textContent = 'Deleting from Drive...';
   authStatus.style.display = 'block';
 
-  // 1. Physically delete images from Google Drive
   const entriesToDelete = entries.filter(e => selectedIds.includes(e.id));
   for (const item of entriesToDelete) {
     if (item.image) {
@@ -719,11 +705,9 @@ btnDelete.addEventListener('click', async () => {
     }
   }
 
-  // 2. Remove from data array
   entries = entries.filter(e => !selectedIds.includes(e.id));
   selectedIds = [];
 
-  // 3. Update the JSON file
   await saveDataToDrive();
 
   authOverlay.style.display = 'none';
@@ -747,4 +731,3 @@ document.getElementById('btn-logout').addEventListener('click', () => {
 
 // Init
 handleRoute();
-// renderFeed() is called automatically after Drive sync
