@@ -259,21 +259,21 @@ function setMasonrySpans() {
   const grid = feedGrid;
   const rowSize = 4; // must match grid-auto-rows in CSS
   const gap = parseInt(window.getComputedStyle(grid).columnGap) || 12;
-  
-  // Phase 1: Clear grid styles & prevent Safari from squishing items during measurement
+
+  // Phase 1: Force Safari to give items infinite vertical space
+  // This stops WebKit from aggressively clipping the box model during measurement
   document.querySelectorAll('.masonry-item').forEach(item => {
-    item.style.gridRowEnd = '';
-    item.style.alignSelf = 'start'; // Safari/WebKit fix
+    item.style.gridRowEnd = 'span 9999';
   });
 
-  // Phase 2: Measure natural heights and apply correct spans
+  // Phase 2: Measure actual unclipped heights and assign proper spans
   document.querySelectorAll('.masonry-item').forEach(item => {
     const child = item.children[0];
-    const height = child ? child.getBoundingClientRect().height : 0;
-    
-    const spans = Math.ceil((height + gap) / (rowSize + gap));
-    item.style.gridRowEnd = `span ${spans}`;
-    item.style.alignSelf = ''; // Restore default alignment
+    if (child) {
+      const height = child.offsetHeight; // offsetHeight ignores transforms
+      const spans = Math.ceil((height + gap) / (rowSize + gap));
+      item.style.gridRowEnd = `span ${spans}`;
+    }
   });
 }
 
@@ -313,9 +313,12 @@ function renderFeed() {
         </div>`;
     } else {
       article.style.backgroundColor = 'transparent';
-      // Added fallback || '100%' so older posts don't collapse to 0 height
+      
+      // Fallback against undefined or corrupt 'NaN%' aspect ratios
+      const safeRatio = (item.aspectRatio && item.aspectRatio !== 'NaN%') ? item.aspectRatio : '100%';
+      
       article.innerHTML = `
-        <div class="shadow-ambient" style="position:relative;width:100%;padding-bottom:${item.aspectRatio || '100%'};background-color:var(--surface-container-low);overflow:hidden;border-radius:var(--rounded-xl);transform:translateZ(0);-webkit-mask-image:-webkit-radial-gradient(white,black);">
+        <div class="shadow-ambient" style="position:relative;width:100%;padding-bottom:${safeRatio};background-color:var(--surface-container-low);overflow:hidden;border-radius:var(--rounded-xl);transform:translateZ(0);-webkit-mask-image:-webkit-radial-gradient(white,black);">
           <img src="${imgSource}" data-drive-id="${driveId || ''}" alt="" class="img-hover" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;"
             onerror="if(this.dataset.driveId&&!this.dataset.retried){this.dataset.retried='1';fetch('https://www.googleapis.com/drive/v3/files/'+this.dataset.driveId+'?alt=media',{headers:{'Authorization':'Bearer '+gapi.client.getToken().access_token}}).then(r=>r.blob()).then(b=>{this.src=URL.createObjectURL(b)}).catch(()=>{})}" />
           <div style="position:absolute;bottom:0;left:0;width:100%;padding:32px 12px 12px;background:linear-gradient(to bottom,transparent,rgba(0,0,0,0.7));display:flex;flex-direction:column;gap:6px;z-index:2;pointer-events:none;">
