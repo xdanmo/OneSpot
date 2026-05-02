@@ -259,15 +259,21 @@ function setMasonrySpans() {
   const grid = feedGrid;
   const rowSize = 4; // must match grid-auto-rows in CSS
   const gap = parseInt(window.getComputedStyle(grid).columnGap) || 12;
+  
+  // Phase 1: Clear grid styles & prevent Safari from squishing items during measurement
   document.querySelectorAll('.masonry-item').forEach(item => {
     item.style.gridRowEnd = '';
-    
-    // Measure the inner article (children[0]) to get the true content height
+    item.style.alignSelf = 'start'; // Safari/WebKit fix
+  });
+
+  // Phase 2: Measure natural heights and apply correct spans
+  document.querySelectorAll('.masonry-item').forEach(item => {
     const child = item.children[0];
     const height = child ? child.getBoundingClientRect().height : 0;
     
     const spans = Math.ceil((height + gap) / (rowSize + gap));
     item.style.gridRowEnd = `span ${spans}`;
+    item.style.alignSelf = ''; // Restore default alignment
   });
 }
 
@@ -288,7 +294,7 @@ function renderFeed() {
       else if (lh3Match) { driveId = lh3Match[1]; imgSource = item.image; }
     }
 
-    // Build article — no selection state baked in, updated via applySelectionStyles()
+    // Build article
     const article = document.createElement('article');
     article.dataset.id = item.id;
     article.className = 'card-hover';
@@ -307,8 +313,9 @@ function renderFeed() {
         </div>`;
     } else {
       article.style.backgroundColor = 'transparent';
+      // Added fallback || '100%' so older posts don't collapse to 0 height
       article.innerHTML = `
-        <div class="shadow-ambient" style="position:relative;width:100%;padding-bottom:${item.aspectRatio};background-color:var(--surface-container-low);overflow:hidden;border-radius:var(--rounded-xl);transform:translateZ(0);-webkit-mask-image:-webkit-radial-gradient(white,black);">
+        <div class="shadow-ambient" style="position:relative;width:100%;padding-bottom:${item.aspectRatio || '100%'};background-color:var(--surface-container-low);overflow:hidden;border-radius:var(--rounded-xl);transform:translateZ(0);-webkit-mask-image:-webkit-radial-gradient(white,black);">
           <img src="${imgSource}" data-drive-id="${driveId || ''}" alt="" class="img-hover" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;"
             onerror="if(this.dataset.driveId&&!this.dataset.retried){this.dataset.retried='1';fetch('https://www.googleapis.com/drive/v3/files/'+this.dataset.driveId+'?alt=media',{headers:{'Authorization':'Bearer '+gapi.client.getToken().access_token}}).then(r=>r.blob()).then(b=>{this.src=URL.createObjectURL(b)}).catch(()=>{})}" />
           <div style="position:absolute;bottom:0;left:0;width:100%;padding:32px 12px 12px;background:linear-gradient(to bottom,transparent,rgba(0,0,0,0.7));display:flex;flex-direction:column;gap:6px;z-index:2;pointer-events:none;">
