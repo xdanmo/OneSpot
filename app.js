@@ -254,67 +254,56 @@ function updateNavIndicator(hash) {
 function renderFeed() {
   feedGrid.innerHTML = '';
   entries.forEach(item => {
-    const isSelected = selectedIds.includes(item.id);
     const itemDiv = document.createElement('div');
     itemDiv.className = 'masonry-item';
-    
-    // Check if image is a Google Drive image
+
+    // Resolve image source
     let driveId = null;
     let imgSource = item.image;
     if (item.image) {
-      // Support legacy uc?id= URLs and new lh3 URLs
       const ucMatch = item.image.match(/[?&]id=([^&]+)/);
       const lh3Match = item.image.match(/lh3\.googleusercontent\.com\/d\/([^/?]+)/);
-      if (ucMatch) {
-        driveId = ucMatch[1];
-        imgSource = `https://lh3.googleusercontent.com/d/${driveId}`;
-      } else if (lh3Match) {
-        driveId = lh3Match[1];
-        imgSource = item.image;
-      }
+      if (ucMatch) { driveId = ucMatch[1]; imgSource = `https://lh3.googleusercontent.com/d/${driveId}`; }
+      else if (lh3Match) { driveId = lh3Match[1]; imgSource = item.image; }
     }
-    
-    let html = '';
-    
+
+    // Build article — no selection state baked in, updated via applySelectionStyles()
+    const article = document.createElement('article');
+    article.dataset.id = item.id;
+    article.className = 'card-hover';
+    article.style.cssText = 'display:block;width:100%;cursor:pointer;border-radius:var(--rounded-xl);transform:scale(1);opacity:1;transition:transform 0.3s cubic-bezier(0.34,1.56,0.64,1),opacity 0.3s;position:relative;';
+
     if (!item.image) {
-      html = `
-        <article class="shadow-ambient ${selectedIds.length === 0 ? 'card-hover' : ''}" 
-          style="position: relative; background-color: var(--surface-container-low); color: var(--on-surface); border-radius: var(--rounded-xl); padding: var(--spacing-md); cursor: pointer; border: 1px solid var(--tertiary-fixed-dim); transform: ${isSelected ? 'scale(0.95)' : 'scale(1)'}; opacity: ${(selectedIds.length > 0 && !isSelected) ? 0.6 : 1}; transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s, border 0.3s; display: block; width: 100%;">
-          ${isSelected ? '<div style="position: absolute; inset: 0; z-index: 30; background-color: rgba(0,0,0,0.4); border-radius: inherit; pointer-events: none;"></div>' : ''}
-          <div style="display: flex; flex-direction: column; gap: var(--spacing-md);">
-            <h2 class="font-headline-md" style="line-height: 1.3; word-break: break-word; font-size: clamp(14px, 4.5vw, 24px);">${item.title}</h2>
-            ${item.url ? `<a href="https://${item.url.replace(/^https?:\/\//, '')}" target="_blank" class="font-body-md" style="display: block; margin-top: var(--spacing-sm); color: var(--outline); text-decoration: underline; pointer-events: ${selectedIds.length > 0 ? 'none' : 'auto'};">${item.url}</a>` : ''}
-          </div>
-        </article>
-      `;
+      article.classList.add('shadow-ambient');
+      article.style.backgroundColor = 'var(--surface-container-low)';
+      article.style.color = 'var(--on-surface)';
+      article.style.padding = 'var(--spacing-md)';
+      article.style.border = '1px solid var(--tertiary-fixed-dim)';
+      article.innerHTML = `
+        <div style="display:flex;flex-direction:column;gap:var(--spacing-md);">
+          <h2 class="font-headline-md" style="line-height:1.3;word-break:break-word;font-size:clamp(14px,4.5vw,24px);">${item.title}</h2>
+          ${item.url ? `<a href="https://${item.url.replace(/^https?:\/\//, '')}" target="_blank" class="font-body-md" style="display:block;margin-top:var(--spacing-sm);color:var(--outline);text-decoration:underline;">${item.url}</a>` : ''}
+        </div>`;
     } else {
-      html = `
-        <article class="${selectedIds.length === 0 ? 'card-hover' : ''}" 
-          style="position: relative; background-color: transparent; border-radius: var(--rounded-xl); cursor: pointer; transform: ${isSelected ? 'scale(0.95)' : 'scale(1)'}; opacity: ${(selectedIds.length > 0 && !isSelected) ? 0.6 : 1}; transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s, border 0.3s; display: block; width: 100%;">
-          <div class="shadow-ambient" style="position: relative; width: 100%; padding-bottom: ${item.aspectRatio}; background-color: var(--surface-container-low); overflow: hidden; border-radius: var(--rounded-xl); transform: translateZ(0); -webkit-mask-image: -webkit-radial-gradient(white, black);">
-            <img src="${imgSource}" data-drive-id="${driveId || ''}" alt="${item.title}" class="img-hover" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover;" />
-            ${isSelected ? '<div style="position: absolute; inset: 0; z-index: 30; background-color: rgba(0,0,0,0.4); border-radius: inherit; pointer-events: none;"></div>' : ''}
-            <div style="position: absolute; bottom: 0; left: 0; width: 100%; padding: 32px 12px 12px; background: linear-gradient(to bottom, transparent, rgba(0,0,0,0.7)); display: flex; flex-direction: column; gap: 6px; z-index: 2; pointer-events: none;">
-              ${item.url ? `<a href="https://${item.url.replace(/^https?:\/\//, '')}" target="_blank" class="font-body-md" style="display: flex; align-items: center; gap: 4px; color: rgba(255,255,255,0.9); text-decoration: none; font-size: 12px; pointer-events: ${selectedIds.length > 0 ? 'none' : 'auto'};"><span class="material-symbols-outlined" style="font-size: 14px;">link</span>${item.url}</a>` : ''}
-            </div>
+      article.style.backgroundColor = 'transparent';
+      article.innerHTML = `
+        <div class="shadow-ambient" style="position:relative;width:100%;padding-bottom:${item.aspectRatio};background-color:var(--surface-container-low);overflow:hidden;border-radius:var(--rounded-xl);transform:translateZ(0);-webkit-mask-image:-webkit-radial-gradient(white,black);">
+          <img src="${imgSource}" data-drive-id="${driveId||''}" alt="" class="img-hover" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;"
+            onerror="if(this.dataset.driveId&&!this.dataset.retried){this.dataset.retried='1';fetch('https://www.googleapis.com/drive/v3/files/'+this.dataset.driveId+'?alt=media',{headers:{'Authorization':'Bearer '+gapi.client.getToken().access_token}}).then(r=>r.blob()).then(b=>{this.src=URL.createObjectURL(b)}).catch(()=>{})}" />
+          <div style="position:absolute;bottom:0;left:0;width:100%;padding:32px 12px 12px;background:linear-gradient(to bottom,transparent,rgba(0,0,0,0.7));display:flex;flex-direction:column;gap:6px;z-index:2;pointer-events:none;">
+            ${item.url ? `<a href="https://${item.url.replace(/^https?:\/\//, '')}" target="_blank" style="display:flex;align-items:center;gap:4px;color:rgba(255,255,255,0.9);text-decoration:none;font-size:12px;"><span class="material-symbols-outlined" style="font-size:14px;">link</span>${item.url}</a>` : ''}
           </div>
-          <div style="padding: 6px 8px 0; display: flex; flex-direction: column;">
-            <h2 class="font-headline-md" style="color: var(--on-background); display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; font-size: 14px; line-height: 1.2;">${item.title}</h2>
-          </div>
-        </article>
-      `;
+        </div>
+        <div style="padding:6px 8px 0;">
+          <h2 class="font-headline-md" style="color:var(--on-background);display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden;font-size:14px;line-height:1.2;">${item.title}</h2>
+        </div>`;
     }
-    
-    itemDiv.innerHTML = html;
-    
-    // Images are public and load directly via lh3.googleusercontent.com
-    
+
     // Events
-    const article = itemDiv.querySelector('article');
     let longPressTriggered = false;
     const cancelPress = () => clearTimeout(pressTimer);
-    
-    article.addEventListener('pointerdown', (e) => {
+
+    article.addEventListener('pointerdown', () => {
       if (selectedIds.length === 0) {
         longPressTriggered = false;
         pressTimer = setTimeout(() => {
@@ -325,15 +314,12 @@ function renderFeed() {
         }, 500);
       }
     });
-    
     article.addEventListener('pointerup', cancelPress);
     article.addEventListener('pointerleave', cancelPress);
     article.addEventListener('pointercancel', cancelPress);
-    
     article.addEventListener('click', (e) => {
       cancelPress();
       if (longPressTriggered) { e.preventDefault(); return; }
-      
       if (selectedIds.length > 0) {
         e.preventDefault();
         if (selectedIds.includes(item.id)) selectedIds = selectedIds.filter(id => id !== item.id);
@@ -344,16 +330,46 @@ function renderFeed() {
       }
     });
 
+    itemDiv.appendChild(article);
     feedGrid.appendChild(itemDiv);
+  });
+
+  applySelectionStyles();
+}
+
+// Updates card visuals in-place — no DOM rebuild, no glitch
+function applySelectionStyles() {
+  const inSelectionMode = selectedIds.length > 0;
+  document.querySelectorAll('article[data-id]').forEach(article => {
+    const id = article.dataset.id;
+    const isSelected = selectedIds.includes(id);
+
+    article.style.transform = isSelected ? 'scale(0.95)' : 'scale(1)';
+    article.style.opacity = (inSelectionMode && !isSelected) ? '0.6' : '1';
+
+    if (inSelectionMode) article.classList.remove('card-hover');
+    else article.classList.add('card-hover');
+
+    // Manage dark overlay for selected state
+    let overlay = article.querySelector('.sel-overlay');
+    if (isSelected && !overlay) {
+      overlay = document.createElement('div');
+      overlay.className = 'sel-overlay';
+      overlay.style.cssText = 'position:absolute;inset:0;z-index:30;background:rgba(0,0,0,0.4);border-radius:inherit;pointer-events:none;';
+      article.prepend(overlay);
+    } else if (!isSelected && overlay) {
+      overlay.remove();
+    }
   });
 }
 
 function updateSelectionState() {
-  renderFeed();
+  applySelectionStyles();
   if (selectedIds.length > 0) {
     bottomNav.style.display = 'none';
     selectionBar.style.display = 'flex';
     selectionCount.textContent = `${selectedIds.length} Selected`;
+    document.getElementById('btn-edit').style.display = selectedIds.length === 1 ? 'block' : 'none';
   } else {
     bottomNav.style.display = 'flex';
     selectionBar.style.display = 'none';
@@ -370,7 +386,7 @@ function openDetailSheet(item) {
     imgHtml = `
       <div style="margin-bottom: 20px; width: 100%; display: flex; justify-content: center;">
         <div style="border-radius: var(--rounded-xl); overflow: hidden; transform: translateZ(0); -webkit-mask-image: -webkit-radial-gradient(white, black); display: inline-block; background-color: var(--surface-container-low); max-width: 100%;">
-          <img src="${sheetImgSource}" alt="${item.title}" style="display: block; max-height: 40vh; max-width: 100%; width: auto; height: auto;" />
+          <img src="${sheetImgSource}" data-drive-id="${ucMatch ? ucMatch[1] : ''}" alt="" style="display: block; max-height: 40vh; max-width: 100%; width: auto; height: auto;" onerror="if(this.dataset.driveId && !this.dataset.retried){this.dataset.retried='1';fetch('https://www.googleapis.com/drive/v3/files/'+this.dataset.driveId+'?alt=media',{headers:{'Authorization':'Bearer '+gapi.client.getToken().access_token}}).then(r=>r.blob()).then(b=>{this.src=URL.createObjectURL(b)}).catch(()=>{})}" />
         </div>
       </div>
     `;
@@ -638,12 +654,13 @@ btnDelete.addEventListener('click', async () => {
   // 2. Remove from data array
   entries = entries.filter(e => !selectedIds.includes(e.id));
   selectedIds = [];
-  updateSelectionState();
-  
+
   // 3. Update the JSON file
   await saveDataToDrive();
-  
+
   authOverlay.style.display = 'none';
+  renderFeed();
+  updateSelectionState();
 });
 
 btnCloseSelection.addEventListener('click', () => {
