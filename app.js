@@ -272,7 +272,6 @@ function setMasonrySpans() {
     
     // THE MATHEMATICAL FIX: 
     // Since CSS grid row-gap is 0, each span is exactly 'rowSize' (4px). 
-    // We only divide the total required height by rowSize.
     const spans = Math.ceil((contentHeight + marginBottom) / rowSize);
     
     item.style.gridRowEnd = `span ${spans}`;
@@ -280,6 +279,13 @@ function setMasonrySpans() {
 }
 
 // --- Rendering ---
+// Debouncer function for image loads to prevent layout thrashing
+let masonryTimeout = null;
+function scheduleMasonryUpdate() {
+  clearTimeout(masonryTimeout);
+  masonryTimeout = setTimeout(setMasonrySpans, 100);
+}
+
 function renderFeed() {
   feedGrid.innerHTML = '';
   entries.forEach(item => {
@@ -372,11 +378,11 @@ function renderFeed() {
   // Apply row spans after paint so heights are known
   requestAnimationFrame(() => {
     setMasonrySpans();
-    // Re-run after images load to correct spans
+    // Re-run safely after images load to correct spans
     feedGrid.querySelectorAll('img').forEach(img => {
       if (!img.complete) {
-        img.addEventListener('load', () => setMasonrySpans(), { once: true });
-        img.addEventListener('error', () => setMasonrySpans(), { once: true });
+        img.addEventListener('load', scheduleMasonryUpdate, { once: true });
+        img.addEventListener('error', scheduleMasonryUpdate, { once: true });
       }
     });
   });
@@ -667,9 +673,23 @@ renderTags();
 
 // --- Bind Global Events ---
 window.addEventListener('hashchange', handleRoute);
+
+// Fix for mobile scroll glitch: Debounce resize and check if width actually changed
+let lastWindowWidth = window.innerWidth;
+let resizeTimer;
+
 window.addEventListener('resize', () => {
-  updateNavIndicator(window.location.hash.replace('#', '') || '/');
-  setMasonrySpans();
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => {
+    updateNavIndicator(window.location.hash.replace('#', '') || '/');
+    
+    // Only recalculate Masonry if the screen WIDTH changes (e.g. rotating device).
+    // This stops the browser from freezing when the mobile address bar hides on scroll!
+    if (window.innerWidth !== lastWindowWidth) {
+      lastWindowWidth = window.innerWidth;
+      setMasonrySpans();
+    }
+  }, 150);
 });
 
 btnDelete.addEventListener('click', async () => {
