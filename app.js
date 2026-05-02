@@ -256,24 +256,26 @@ function updateNavIndicator(hash) {
 
 // --- Masonry Row Spanning ---
 function setMasonrySpans() {
-  const grid = feedGrid;
-  const rowSize = 4; // must match grid-auto-rows in CSS
-  const gap = parseInt(window.getComputedStyle(grid).columnGap) || 12;
+  const rowSize = 4; // MUST match grid-auto-rows in style.css
 
-  // Phase 1: Force Safari to give items infinite vertical space
-  // This stops WebKit from aggressively clipping the box model during measurement
   document.querySelectorAll('.masonry-item').forEach(item => {
-    item.style.gridRowEnd = 'span 9999';
-  });
-
-  // Phase 2: Measure actual unclipped heights and assign proper spans
-  document.querySelectorAll('.masonry-item').forEach(item => {
-    const child = item.children[0];
-    if (child) {
-      const height = child.offsetHeight; // offsetHeight ignores transforms
-      const spans = Math.ceil((height + gap) / (rowSize + gap));
-      item.style.gridRowEnd = `span ${spans}`;
-    }
+    item.style.gridRowEnd = ''; // Reset to flow naturally
+    
+    // Measure the actual inner content <article> to avoid grid-clipping measuring errors
+    const article = item.children[0];
+    if (!article) return;
+    
+    const contentHeight = article.getBoundingClientRect().height;
+    
+    // Get the dynamic margin-bottom applied by CSS (12px on mobile, 16px on desktop)
+    const marginBottom = parseFloat(window.getComputedStyle(item).marginBottom) || 12;
+    
+    // THE MATHEMATICAL FIX: 
+    // Since CSS grid row-gap is 0, each span is exactly 'rowSize' (4px). 
+    // We only divide the total required height by rowSize.
+    const spans = Math.ceil((contentHeight + marginBottom) / rowSize);
+    
+    item.style.gridRowEnd = `span ${spans}`;
   });
 }
 
