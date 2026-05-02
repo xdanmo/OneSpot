@@ -1,11 +1,13 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>OneSpot</title>
   <link rel="stylesheet" href="style.css">
 </head>
+
 <body>
   <div class="app-container">
     <!-- Home Feed View -->
@@ -14,22 +16,32 @@
     </main>
 
     <!-- Placeholder Views -->
-    <main class="container" id="view-profile" style="display: none; padding-top: var(--spacing-xl); text-align: center; max-width: 600px; margin: 0 auto;">
-      <div style="background-color: var(--surface-container-low); border: 1px solid var(--tertiary-fixed-dim); border-radius: var(--rounded-xl); padding: 32px 24px; display: flex; flex-direction: column; align-items: center; gap: 16px;" class="shadow-ambient">
-        <img id="profile-image" src="" alt="Profile" style="width: 96px; height: 96px; border-radius: 50%; object-fit: cover; background-color: var(--surface-container-highest); display: none;" />
-        <div id="profile-placeholder" style="width: 96px; height: 96px; border-radius: 50%; background-color: var(--surface-container-highest); display: flex; align-items: center; justify-content: center; color: var(--on-surface-variant);">
+    <main class="container" id="view-profile"
+      style="display: none; padding-top: var(--spacing-xl); text-align: center; max-width: 600px; margin: 0 auto;">
+      <div
+        style="background-color: var(--surface-container-low); border: 1px solid var(--tertiary-fixed-dim); border-radius: var(--rounded-xl); padding: 32px 24px; display: flex; flex-direction: column; align-items: center; gap: 16px;"
+        class="shadow-ambient">
+        <img id="profile-image" src="" alt="Profile"
+          style="width: 96px; height: 96px; border-radius: 50%; object-fit: cover; background-color: var(--surface-container-highest); display: none;" />
+        <div id="profile-placeholder"
+          style="width: 96px; height: 96px; border-radius: 50%; background-color: var(--surface-container-highest); display: flex; align-items: center; justify-content: center; color: var(--on-surface-variant);">
           <span class="material-symbols-outlined" style="font-size: 48px;">person</span>
         </div>
         <div>
           <h1 id="profile-name" class="font-display" style="font-size: 24px;">Loading...</h1>
           <p id="profile-email" class="font-body-md" style="color: var(--on-surface-variant); margin-top: 4px;"></p>
         </div>
-        <button id="btn-logout" class="font-label-sm shadow-ambient" style="background-color: var(--surface-container-highest); color: var(--error); border: 1px solid var(--error); border-radius: var(--rounded-full); padding: 12px 24px; margin-top: 16px; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.backgroundColor='var(--error)'; this.style.color='var(--on-error)';" onmouseout="this.style.backgroundColor='var(--surface-container-highest)'; this.style.color='var(--error)';">Disconnect Drive</button>
+        <button id="btn-logout" class="font-label-sm shadow-ambient"
+          style="background-color: var(--surface-container-highest); color: var(--error); border: 1px solid var(--error); border-radius: var(--rounded-full); padding: 12px 24px; margin-top: 16px; cursor: pointer; transition: all 0.2s;"
+          onmouseover="this.style.backgroundColor='var(--error)'; this.style.color='var(--on-error)';"
+          onmouseout="this.style.backgroundColor='var(--surface-container-highest)'; this.style.color='var(--error)';">Disconnect
+          Drive</button>
       </div>
     </main>
-    <main class="container" id="view-add" style="display: none; padding-top: var(--spacing-xl); max-width: 672px; padding-bottom: 120px; margin: 0 auto;">
+    <main class="container" id="view-add"
+      style="display: none; padding-top: var(--spacing-xl); max-width: 672px; padding-bottom: 120px; margin: 0 auto;">
       <div style="display: flex; flex-direction: column; gap: var(--spacing-md);">
-        
+
         <!-- Live Preview -->
         <div style="margin-bottom: var(--spacing-lg);">
           <div style="max-width: 400px; margin: 0 auto;" id="add-preview-container">
@@ -39,53 +51,78 @@
 
         <!-- Main Text Input -->
         <div style="position: relative;">
-          <textarea id="add-text" placeholder="Write your thoughts..." class="font-body-md shadow-ambient" style="width: 100%; min-height: 120px; background-color: var(--surface-container-highest); border: 1px solid var(--tertiary-fixed-dim); border-radius: var(--rounded); padding: 16px; color: var(--on-surface); outline: none; transition: all 0.2s; resize: vertical;" onfocus="this.style.borderColor='var(--primary)'; this.style.boxShadow='0 0 0 1px var(--primary)';" onblur="this.style.borderColor='var(--tertiary-fixed-dim)'; this.style.boxShadow='none';"></textarea>
+          <textarea id="add-text" placeholder="Write your thoughts..." class="font-body-md shadow-ambient"
+            style="width: 100%; min-height: 120px; background-color: var(--surface-container-highest); border: 1px solid var(--tertiary-fixed-dim); border-radius: var(--rounded); padding: 16px; color: var(--on-surface); outline: none; transition: all 0.2s; resize: vertical;"
+            onfocus="this.style.borderColor='var(--primary)'; this.style.boxShadow='0 0 0 1px var(--primary)';"
+            onblur="this.style.borderColor='var(--tertiary-fixed-dim)'; this.style.boxShadow='none';"></textarea>
         </div>
 
         <!-- Optional Link Input -->
         <div style="position: relative;">
-          <div style="position: absolute; top: 0; bottom: 0; left: 0; padding-left: var(--spacing-md); display: flex; align-items: center; pointer-events: none;">
+          <div
+            style="position: absolute; top: 0; bottom: 0; left: 0; padding-left: var(--spacing-md); display: flex; align-items: center; pointer-events: none;">
             <span class="material-symbols-outlined" style="color: var(--outline-variant);">link</span>
           </div>
-          <input type="text" id="add-link" placeholder="Add an optional link..." class="font-body-md shadow-ambient" style="width: 100%; background-color: var(--surface-container-highest); border: 1px solid var(--tertiary-fixed-dim); border-radius: var(--rounded-full); padding: 16px; padding-left: 64px; color: var(--on-surface); outline: none; transition: all 0.2s;" onfocus="this.style.borderColor='var(--primary)'; this.style.boxShadow='0 0 0 1px var(--primary)';" onblur="this.style.borderColor='var(--tertiary-fixed-dim)'; this.style.boxShadow='none';" />
+          <input type="text" id="add-link" placeholder="Add an optional link..." class="font-body-md shadow-ambient"
+            style="width: 100%; background-color: var(--surface-container-highest); border: 1px solid var(--tertiary-fixed-dim); border-radius: var(--rounded-full); padding: 16px; padding-left: 64px; color: var(--on-surface); outline: none; transition: all 0.2s;"
+            onfocus="this.style.borderColor='var(--primary)'; this.style.boxShadow='0 0 0 1px var(--primary)';"
+            onblur="this.style.borderColor='var(--tertiary-fixed-dim)'; this.style.boxShadow='none';" />
         </div>
 
         <!-- Optional Image Input -->
         <div style="display: flex; gap: var(--spacing-sm);">
           <div style="position: relative; flex: 1;">
-            <div style="position: absolute; top: 0; bottom: 0; left: 0; padding-left: var(--spacing-md); display: flex; align-items: center; pointer-events: none;">
+            <div
+              style="position: absolute; top: 0; bottom: 0; left: 0; padding-left: var(--spacing-md); display: flex; align-items: center; pointer-events: none;">
               <span class="material-symbols-outlined" style="color: var(--outline-variant);">image</span>
             </div>
-            <input type="text" id="add-image" placeholder="Add image URL or upload file..." class="font-body-md shadow-ambient" style="width: 100%; background-color: var(--surface-container-highest); border: 1px solid var(--tertiary-fixed-dim); border-radius: var(--rounded-full); padding: 16px; padding-left: 64px; color: var(--on-surface); outline: none; transition: all 0.2s;" onfocus="this.style.borderColor='var(--primary)'; this.style.boxShadow='0 0 0 1px var(--primary)';" onblur="this.style.borderColor='var(--tertiary-fixed-dim)'; this.style.boxShadow='none';" />
+            <input type="text" id="add-image" placeholder="Add image URL or upload file..."
+              class="font-body-md shadow-ambient"
+              style="width: 100%; background-color: var(--surface-container-highest); border: 1px solid var(--tertiary-fixed-dim); border-radius: var(--rounded-full); padding: 16px; padding-left: 64px; color: var(--on-surface); outline: none; transition: all 0.2s;"
+              onfocus="this.style.borderColor='var(--primary)'; this.style.boxShadow='0 0 0 1px var(--primary)';"
+              onblur="this.style.borderColor='var(--tertiary-fixed-dim)'; this.style.boxShadow='none';" />
           </div>
-          <label class="shadow-ambient" style="display: flex; align-items: center; justify-content: center; gap: 8px; background-color: var(--surface-container-highest); border: 1px solid var(--tertiary-fixed-dim); border-radius: var(--rounded-full); padding: 0 24px; color: var(--on-surface); cursor: pointer; transition: background-color 0.2s;" onmouseover="this.style.backgroundColor='var(--surface-variant)';" onmouseout="this.style.backgroundColor='var(--surface-container-highest)';">
+          <label class="shadow-ambient"
+            style="display: flex; align-items: center; justify-content: center; gap: 8px; background-color: var(--surface-container-highest); border: 1px solid var(--tertiary-fixed-dim); border-radius: var(--rounded-full); padding: 0 24px; color: var(--on-surface); cursor: pointer; transition: background-color 0.2s;"
+            onmouseover="this.style.backgroundColor='var(--surface-variant)';"
+            onmouseout="this.style.backgroundColor='var(--surface-container-highest)';">
             <span class="material-symbols-outlined">upload_file</span>
             <input type="file" id="add-image-file" accept="image/*" style="display: none;" />
           </label>
         </div>
 
         <!-- Save Button -->
-        <button id="btn-save-entry" class="font-label-sm shadow-ambient" style="width: 100%; background-color: var(--primary); color: var(--on-primary); border-radius: var(--rounded-full); padding: 16px var(--spacing-md); margin-top: var(--spacing-sm); transition: opacity 0.2s; cursor: pointer;" onmouseover="this.style.opacity='0.9';" onmouseout="this.style.opacity='1';">Save Entry</button>
+        <button id="btn-save-entry" class="font-label-sm shadow-ambient"
+          style="width: 100%; background-color: var(--primary); color: var(--on-primary); border-radius: var(--rounded-full); padding: 16px var(--spacing-md); margin-top: var(--spacing-sm); transition: opacity 0.2s; cursor: pointer;"
+          onmouseover="this.style.opacity='0.9';" onmouseout="this.style.opacity='1';">Save Entry</button>
       </div>
 
       <!-- Tags Section -->
       <div style="margin-top: var(--spacing-xl);">
-        <h2 class="font-label-sm" style="color: var(--on-surface-variant); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: var(--spacing-md);">Tags</h2>
+        <h2 class="font-label-sm"
+          style="color: var(--on-surface-variant); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: var(--spacing-md);">
+          Tags</h2>
         <div id="tags-container" style="display: flex; flex-wrap: wrap; gap: var(--spacing-sm);">
           <!-- Tags will be injected here -->
         </div>
       </div>
     </main>
-    
+
     <!-- Selection Bar -->
-    <div id="selection-bar" style="display: none; position: fixed; bottom: 32px; left: 0; right: 0; justify-content: center; align-items: center; z-index: 60;">
-      <div class="shadow-nav" style="position: relative; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 16px; border-radius: var(--rounded-full); min-width: 280px; background-color: rgba(242, 240, 235, 0.95); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.5);">
-        <span class="font-label-md" style="color: var(--on-surface); margin-left: 8px;" id="selection-count">0 Selected</span>
+    <div id="selection-bar"
+      style="display: none; position: fixed; bottom: 32px; left: 0; right: 0; justify-content: center; align-items: center; z-index: 60;">
+      <div class="shadow-nav"
+        style="position: relative; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 16px; border-radius: var(--rounded-full); min-width: 280px; background-color: rgba(242, 240, 235, 0.95); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.5);">
+        <span class="font-label-md" style="color: var(--on-surface); margin-left: 8px;" id="selection-count">0
+          Selected</span>
         <div style="display: flex; align-items: center; gap: 12px;">
-          <button id="btn-edit" class="font-label-sm" style="background-color: var(--surface-container); color: var(--on-surface); border: 1px solid var(--outline-variant); border-radius: var(--rounded-full); padding: 8px 16px; cursor: pointer; display: none;">Edit</button>
-          <button id="btn-delete" class="font-label-sm" style="background-color: var(--error); color: var(--on-error); border: none; border-radius: var(--rounded-full); padding: 8px 16px; cursor: pointer;">Delete</button>
+          <button id="btn-edit" class="font-label-sm"
+            style="background-color: var(--surface-container); color: var(--on-surface); border: 1px solid var(--outline-variant); border-radius: var(--rounded-full); padding: 8px 16px; cursor: pointer; display: none;">Edit</button>
+          <button id="btn-delete" class="font-label-sm"
+            style="background-color: var(--error); color: var(--on-error); border: none; border-radius: var(--rounded-full); padding: 8px 16px; cursor: pointer;">Delete</button>
           <div style="width: 1px; height: 24px; background-color: var(--outline-variant);"></div>
-          <button id="btn-close-selection" style="display: flex; align-items: center; justify-content: center; background-color: transparent; border: none; color: var(--on-surface-variant); cursor: pointer; padding: 0;">
+          <button id="btn-close-selection"
+            style="display: flex; align-items: center; justify-content: center; background-color: transparent; border: none; color: var(--on-surface-variant); cursor: pointer; padding: 0;">
             <span class="material-symbols-outlined">close</span>
           </button>
         </div>
@@ -93,49 +130,68 @@
     </div>
 
     <!-- Bottom Nav -->
-    <div id="bottom-nav" style="position: fixed; bottom: 32px; left: 0; right: 0; display: flex; justify-content: center; align-items: center; z-index: 50;">
-      <nav id="nav-container" class="shadow-nav" style="position: relative; display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 12px 16px; border-radius: var(--rounded-full); min-width: 280px; background-color: rgba(242, 240, 235, 0.6); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.5);">
-        <div id="nav-indicator" style="position: absolute; left: 0; top: 0; width: 0; height: 0; background-color: var(--primary); border-radius: var(--rounded-full); opacity: 0; transition: none; z-index: 0;"></div>
-        <a href="#/" class="nav-link" data-index="0" style="position: relative; z-index: 1; display: flex; align-items: center; justify-content: center; padding: 16px; border-radius: var(--rounded-full); transition: color 0.5s ease, transform 0.5s ease; color: var(--outline);">
+    <div id="bottom-nav"
+      style="position: fixed; bottom: 32px; left: 0; right: 0; display: flex; justify-content: center; align-items: center; z-index: 50;">
+      <nav id="nav-container" class="shadow-nav"
+        style="position: relative; display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 12px 16px; border-radius: var(--rounded-full); min-width: 280px; background-color: rgba(242, 240, 235, 0.6); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.5);">
+        <div id="nav-indicator"
+          style="position: absolute; left: 0; top: 0; width: 0; height: 0; background-color: var(--primary); border-radius: var(--rounded-full); opacity: 0; transition: none; z-index: 0;">
+        </div>
+        <a href="#/" class="nav-link" data-index="0"
+          style="position: relative; z-index: 1; display: flex; align-items: center; justify-content: center; padding: 16px; border-radius: var(--rounded-full); transition: color 0.5s ease, transform 0.5s ease; color: var(--outline);">
           <span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">home</span>
         </a>
-        <a href="#/profile" class="nav-link" data-index="1" style="position: relative; z-index: 1; display: flex; align-items: center; justify-content: center; padding: 16px; border-radius: var(--rounded-full); transition: color 0.5s ease, transform 0.5s ease; color: var(--outline);">
+        <a href="#/profile" class="nav-link" data-index="1"
+          style="position: relative; z-index: 1; display: flex; align-items: center; justify-content: center; padding: 16px; border-radius: var(--rounded-full); transition: color 0.5s ease, transform 0.5s ease; color: var(--outline);">
           <span class="material-symbols-outlined">person</span>
         </a>
-        <a href="#/add" class="nav-link" data-index="2" style="position: relative; z-index: 1; display: flex; align-items: center; justify-content: center; padding: 16px; border-radius: var(--rounded-full); transition: color 0.5s ease, transform 0.5s ease; color: var(--outline);">
+        <a href="#/add" class="nav-link" data-index="2"
+          style="position: relative; z-index: 1; display: flex; align-items: center; justify-content: center; padding: 16px; border-radius: var(--rounded-full); transition: color 0.5s ease, transform 0.5s ease; color: var(--outline);">
           <span class="material-symbols-outlined">add</span>
         </a>
       </nav>
     </div>
 
     <!-- Detail Sheet -->
-    <div id="detail-backdrop" style="position: fixed; inset: 0; z-index: 100; background-color: rgba(0,0,0,0.35); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); opacity: 0; transition: opacity 0.3s ease; pointer-events: none;"></div>
-    <div id="detail-sheet" style="position: fixed; bottom: 0; left: 0; right: 0; z-index: 101; background-color: var(--surface); border-radius: 24px 24px 0 0; box-shadow: 0 -20px 60px rgba(0,0,0,0.18); max-height: 92dvh; overflow-y: auto; overscroll-behavior: contain; transform: translateY(100%); transition: transform 0.35s cubic-bezier(0.32, 0.72, 0, 1);">
+    <div id="detail-backdrop"
+      style="position: fixed; inset: 0; z-index: 100; background-color: rgba(0,0,0,0.35); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); opacity: 0; transition: opacity 0.3s ease; pointer-events: none;">
+    </div>
+    <div id="detail-sheet"
+      style="position: fixed; bottom: 0; left: 0; right: 0; z-index: 101; background-color: var(--surface); border-radius: 24px 24px 0 0; box-shadow: 0 -20px 60px rgba(0,0,0,0.18); max-height: 92dvh; overflow-y: auto; overscroll-behavior: contain; transform: translateY(100%); transition: transform 0.35s cubic-bezier(0.32, 0.72, 0, 1);">
       <div style="display: flex; justify-content: center; padding-top: 14px; padding-bottom: 6px;">
         <div style="width: 36px; height: 4px; border-radius: 99px; background-color: var(--outline-variant);"></div>
       </div>
       <div style="display: flex; align-items: center; justify-content: space-between; padding: 8px 20px 12px;">
-        <button id="btn-sheet-edit" class="font-label-sm" style="display: flex; align-items: center; gap: 6px; background-color: var(--surface-container-high); border: 1px solid var(--outline-variant); border-radius: 9999px; padding: 8px 16px; color: var(--on-surface); cursor: pointer; transition: background-color 0.2s;">
+        <button id="btn-sheet-edit" class="font-label-sm"
+          style="display: flex; align-items: center; gap: 6px; background-color: var(--surface-container-high); border: 1px solid var(--outline-variant); border-radius: 9999px; padding: 8px 16px; color: var(--on-surface); cursor: pointer; transition: background-color 0.2s;">
           <span class="material-symbols-outlined" style="font-size: 16px;">edit</span> Edit
         </button>
-        <button id="btn-sheet-close" style="background: var(--surface-container); border: none; border-radius: 9999px; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; cursor: pointer; color: var(--on-surface-variant);">
+        <button id="btn-sheet-close"
+          style="background: var(--surface-container); border: none; border-radius: 9999px; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; cursor: pointer; color: var(--on-surface-variant);">
           <span class="material-symbols-outlined" style="font-size: 20px;">close</span>
         </button>
       </div>
-      <div id="detail-content" style="padding: 0 20px calc(48px + env(safe-area-inset-bottom)); overflow: hidden;"></div>
+      <div id="detail-content" style="padding: 0 20px calc(48px + env(safe-area-inset-bottom)); overflow: hidden;">
+      </div>
     </div>
-    
+
     <!-- Auth Overlay -->
-    <div id="auth-overlay" style="position: fixed; inset: 0; background-color: var(--background); z-index: 200; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+    <div id="auth-overlay"
+      style="position: fixed; inset: 0; background-color: var(--background); z-index: 200; display: flex; flex-direction: column; align-items: center; justify-content: center;">
       <h1 class="font-display" style="margin-bottom: var(--spacing-md);">OneSpot</h1>
-      <p class="font-body-lg" style="color: var(--on-surface-variant); margin-bottom: var(--spacing-xl);">Your data, your drive.</p>
-      <button id="btn-login" class="font-label-sm shadow-ambient" style="background-color: var(--primary); color: var(--on-primary); border-radius: var(--rounded-full); padding: 16px 32px; cursor: pointer; transition: opacity 0.2s; display: none;">Connect Google Drive</button>
-      <p id="auth-status" class="font-label-sm" style="margin-top: var(--spacing-md); color: var(--on-surface-variant);">Initializing...</p>
+      <p class="font-body-lg" style="color: var(--on-surface-variant); margin-bottom: var(--spacing-xl);">Your data,
+        your drive.</p>
+      <button id="btn-login" class="font-label-sm shadow-ambient"
+        style="background-color: var(--primary); color: var(--on-primary); border-radius: var(--rounded-full); padding: 16px 32px; cursor: pointer; transition: opacity 0.2s; display: none;">Connect
+        Google Drive</button>
+      <p id="auth-status" class="font-label-sm"
+        style="margin-top: var(--spacing-md); color: var(--on-surface-variant);">Initializing...</p>
     </div>
   </div>
 
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <script src="https://apis.google.com/js/api.js" async defer></script>
-  <script src="app.js"></script>
+  <script src="app.js" type="module"></script>
 </body>
+
 </html>
