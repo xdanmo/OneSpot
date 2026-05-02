@@ -10,6 +10,7 @@ let dataFileId = null;
 
 let entries = [];
 let selectedIds = [];
+let isInitialRender = true;
 let lastSelectionTime = 0;
 
 // DOM Elements
@@ -237,7 +238,6 @@ async function uploadImageToDrive(file) {
 
 // --- Routing & UI Snap Animations ---
 function handleRoute(noAnimate = false) {
-  // Ensure event objects aren't accidentally passed as the noAnimate boolean
   if (typeof noAnimate !== 'boolean') noAnimate = false;
   
   const hash = window.location.hash.replace('#', '') || '/';
@@ -266,7 +266,9 @@ function updateNavIndicator(hash, noAnimate = false) {
   const activeLink = navLinks[activeIndex];
   if (activeLink && navIndicator) {
     // Kill transition instantly if requested
-    if (noAnimate) navIndicator.style.transition = 'none';
+    if (noAnimate) {
+      navIndicator.style.transition = 'none';
+    }
 
     navIndicator.style.left = activeLink.offsetLeft + 'px';
     navIndicator.style.top = activeLink.offsetTop + 'px';
@@ -301,7 +303,6 @@ function setMasonrySpans() {
 }
 
 // --- Rendering ---
-// Debouncer function for image loads to prevent layout thrashing
 let masonryTimeout = null;
 function scheduleMasonryUpdate() {
   clearTimeout(masonryTimeout);
@@ -462,22 +463,30 @@ function applySelectionStyles() {
 
 function updateSelectionState() {
   applySelectionStyles();
+  
+  // Make bottom nav fade smoothly instead of display:none
+  bottomNav.style.transition = 'opacity 0.2s ease';
+
   if (selectedIds.length > 0) {
-    bottomNav.style.display = 'none';
+    // Hide Bottom Nav gracefully
+    bottomNav.style.opacity = '0';
+    bottomNav.style.pointerEvents = 'none';
+    
+    // Show Selection Bar
     selectionBar.style.display = 'flex';
     selectionCount.textContent = `${selectedIds.length} Selected`;
     const btnEdit = document.getElementById('btn-edit');
     if (btnEdit) btnEdit.style.display = selectedIds.length === 1 ? 'block' : 'none';
   } else {
-    bottomNav.style.display = 'flex';
+    // Show Bottom Nav gracefully
+    bottomNav.style.opacity = '1';
+    bottomNav.style.pointerEvents = 'auto';
+    
+    // Hide Selection Bar
     selectionBar.style.display = 'none';
     
-    // Snaps the indicator instantly without animation when the bar returns!
-    setTimeout(() => {
-      requestAnimationFrame(() => {
-        updateNavIndicator(window.location.hash.replace('#', '') || '/', true);
-      });
-    }, 150);
+    // Snaps the indicator instantly because layout geometry was NEVER lost!
+    updateNavIndicator(window.location.hash.replace('#', '') || '/', true);
   }
 }
 
