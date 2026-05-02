@@ -209,8 +209,7 @@ async function uploadImageToDrive(file) {
 
   authOverlay.style.display = 'none';
   
-  // FIX: Added the missing $ and forced HTTPS to prevent iOS Safari mixed-content blocks
-  return `https://lh3.googleusercontent.com/d/${data.id}`;
+  return `https://googleusercontent.com/profile/picture/0${data.id}`;
 }
 
 
@@ -292,15 +291,14 @@ function renderFeed() {
     let driveId = null;
     let imgSource = item.image;
     if (item.image) {
-      // FIX: Matches Google Drive IDs and uses secure HTTPS URLs
       const ucMatch = item.image.match(/[?&]id=([^&]+)/);
       const lh3Match = item.image.match(/lh3\.googleusercontent\.com\/d\/([^/?]+)/);
-      if (ucMatch) { driveId = ucMatch[1]; imgSource = `https://lh3.googleusercontent.com/d/${driveId}`; }
+      if (ucMatch) { driveId = ucMatch[1]; imgSource = `https://googleusercontent.com/profile/picture/0${driveId}`; }
       else if (lh3Match) { driveId = lh3Match[1]; imgSource = item.image; }
       else if (item.image.includes('googleusercontent')) { 
         // Catch-all for our own generated URLs if they bypass the regex
         imgSource = item.image; 
-        const parts = item.image.split('/d/');
+        const parts = item.image.split('/0');
         if (parts.length > 1) driveId = parts[1];
       }
     }
@@ -349,8 +347,10 @@ function renderFeed() {
     });
 
     article.addEventListener('pointerdown', () => {
+      // FIX: Ensure this resets on EVERY tap so the first post can be deselected later
+      longPressTriggered = false;
+      
       if (selectedIds.length === 0) {
-        longPressTriggered = false;
         pressTimer = setTimeout(() => {
           longPressTriggered = true;
           selectedIds = [item.id];
@@ -366,7 +366,13 @@ function renderFeed() {
     
     article.addEventListener('click', (e) => {
       cancelPress();
-      if (longPressTriggered) { e.preventDefault(); return; }
+      
+      if (longPressTriggered) { 
+        e.preventDefault(); 
+        longPressTriggered = false; // Double protection reset
+        return; 
+      }
+      
       if (selectedIds.length > 0) {
         e.preventDefault();
         if (selectedIds.includes(item.id)) selectedIds = selectedIds.filter(id => id !== item.id);
@@ -437,10 +443,9 @@ function openDetailSheet(item) {
   let imgHtml = '';
   if (item.image) {
     let sheetImgSource = item.image;
-    // FIX: Secure HTTPS for detail sheet too
     const ucMatch = item.image.match(/[?&]id=([^&]+)/);
     if (ucMatch) { 
-      sheetImgSource = `https://lh3.googleusercontent.com/d/${ucMatch[1]}`;
+      sheetImgSource = `https://googleusercontent.com/profile/picture/0${ucMatch[1]}`;
     } else if (item.image.includes('googleusercontent')) {
       sheetImgSource = item.image;
     }
