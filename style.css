@@ -76,7 +76,7 @@
   margin: 0;
   padding: 0;
   box-sizing: border-box;
-  /* FIX: Removes the ugly blue tap highlight on mobile devices */
+  /* Removes the ugly blue tap highlight on mobile devices */
   -webkit-tap-highlight-color: transparent; 
 }
 
@@ -109,7 +109,6 @@ button {
   font-family: inherit;
   border: none;
   cursor: pointer;
-  /* Double-ensuring buttons don't get highlighted */
   outline: none; 
 }
 
@@ -170,7 +169,6 @@ input {
   }
 }
 
-
 /* Masonry Grid — row-first fill with JS row-span sizing (no gaps) */
 .masonry-grid {
   display: grid;
@@ -215,9 +213,21 @@ input {
   }
 }
 
-/* Card Hover Effects */
+/* Card Hover & Mobile Select Prevention Effects */
 .card-hover {
   transition: transform 0.3s ease, box-shadow 0.3s ease !important;
+  
+  /* FIX: Stop mobile browsers from popping up text copy/image save menus on long press */
+  -webkit-touch-callout: none; /* iOS Safari */
+  -webkit-user-select: none;   /* Safari */
+  -moz-user-select: none;      /* Firefox */
+  -ms-user-select: none;       /* IE/Edge */
+  user-select: none;           /* Standard */
+}
+
+/* Prevent image dragging while trying to long-press or scroll */
+.card-hover img {
+  -webkit-user-drag: none;
 }
 
 .card-hover:hover {
