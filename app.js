@@ -10,7 +10,6 @@ let dataFileId = null;
 
 let entries = [];
 let selectedIds = [];
-let isInitialRender = true;
 let lastSelectionTime = 0;
 
 // DOM Elements
@@ -44,7 +43,7 @@ window.handleImageError = async function(img) {
   const driveId = img.dataset.driveId;
 
   if (!driveId || driveId.includes('{data.id}')) {
-    img.style.display = 'none'; // Hide completely if it's an old broken post
+    img.style.display = 'none'; 
     return;
   }
 
@@ -77,7 +76,6 @@ window.onload = function () {
         throw (response);
       }
 
-      // Save token to prevent logout on refresh
       const tokenInfo = Object.assign({}, response, {
         expires_at: Date.now() + (response.expires_in * 1000)
       });
@@ -237,16 +235,20 @@ async function uploadImageToDrive(file) {
 }
 
 
-// --- Routing ---
-function handleRoute() {
+// --- Routing & UI Snap Animations ---
+function handleRoute(noAnimate = false) {
+  // Ensure event objects aren't accidentally passed as the noAnimate boolean
+  if (typeof noAnimate !== 'boolean') noAnimate = false;
+  
   const hash = window.location.hash.replace('#', '') || '/';
   Object.values(views).forEach(v => v.style.display = 'none');
   if (views[hash]) views[hash].style.display = 'block';
   else views['/'].style.display = 'block';
-  updateNavIndicator(hash);
+  
+  updateNavIndicator(hash, noAnimate);
 }
 
-function updateNavIndicator(hash) {
+function updateNavIndicator(hash, noAnimate = false) {
   let activeIndex = 0;
   if (hash.startsWith('/profile')) activeIndex = 1;
   if (hash.startsWith('/add')) activeIndex = 2;
@@ -263,18 +265,19 @@ function updateNavIndicator(hash) {
 
   const activeLink = navLinks[activeIndex];
   if (activeLink && navIndicator) {
+    // Kill transition instantly if requested
+    if (noAnimate) navIndicator.style.transition = 'none';
+
     navIndicator.style.left = activeLink.offsetLeft + 'px';
     navIndicator.style.top = activeLink.offsetTop + 'px';
     navIndicator.style.width = activeLink.offsetWidth + 'px';
     navIndicator.style.height = activeLink.offsetHeight + 'px';
     navIndicator.style.opacity = '1';
 
-    if (isInitialRender) {
-      navIndicator.style.transition = 'none';
-      setTimeout(() => {
-        isInitialRender = false;
-        navIndicator.style.transition = 'all 0.5s ease';
-      }, 50);
+    // Force browser to redraw immediately, then turn transition back on for tab clicks
+    if (noAnimate) {
+      void navIndicator.offsetWidth; 
+      navIndicator.style.transition = 'all 0.5s ease';
     }
   }
 }
@@ -469,11 +472,10 @@ function updateSelectionState() {
     bottomNav.style.display = 'flex';
     selectionBar.style.display = 'none';
     
-    // FIX: Give the browser enough time to finish drawing the flexbox layout 
-    // before we try to measure the icon's exact coordinates for the black dot.
+    // Snaps the indicator instantly without animation when the bar returns!
     setTimeout(() => {
       requestAnimationFrame(() => {
-        updateNavIndicator(window.location.hash.replace('#', '') || '/');
+        updateNavIndicator(window.location.hash.replace('#', '') || '/', true);
       });
     }, 150);
   }
@@ -740,7 +742,7 @@ let resizeTimer;
 window.addEventListener('resize', () => {
   clearTimeout(resizeTimer);
   resizeTimer = setTimeout(() => {
-    updateNavIndicator(window.location.hash.replace('#', '') || '/');
+    updateNavIndicator(window.location.hash.replace('#', '') || '/', true); // Instant snap on resize
     if (window.innerWidth !== lastWindowWidth) {
       lastWindowWidth = window.innerWidth;
       setMasonrySpans();
@@ -798,4 +800,4 @@ document.getElementById('btn-logout').addEventListener('click', () => {
   window.location.reload();
 });
 
-handleRoute();
+handleRoute(true); // Call instantly without animation on initial page load
