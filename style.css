@@ -96,8 +96,7 @@ input, textarea {
   user-select: auto !important;
 }
 
-html,
-body {
+html, body {
   font-family: var(--font-family);
   background-color: var(--background);
   color: var(--on-background);
@@ -110,6 +109,7 @@ body {
 .app-container {
   min-height: 100dvh;
   overflow-y: auto;
+  position: relative;
 }
 
 a {
@@ -118,31 +118,12 @@ a {
   outline: none;
 }
 
-ul {
-  list-style: none;
-}
+ul { list-style: none; }
+button { font-family: inherit; border: none; cursor: pointer; outline: none; }
+input { font-family: inherit; }
+::-webkit-scrollbar { display: none; }
+* { -ms-overflow-style: none; scrollbar-width: none; }
 
-button {
-  font-family: inherit;
-  border: none;
-  cursor: pointer;
-  outline: none; 
-}
-
-input {
-  font-family: inherit;
-}
-
-::-webkit-scrollbar {
-  display: none;
-}
-
-* {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
-}
-
-/* Horizontal scroll hiding specifically for the tags */
 .hide-scroll {
   -ms-overflow-style: none;
   scrollbar-width: none;
@@ -175,6 +156,7 @@ input {
   width: 100%;
   max-width: 2000px;
   margin: 0 auto;
+  background-color: var(--background);
 }
 
 @media (min-width: 600px) {
@@ -196,10 +178,17 @@ input {
 .masonry-item {
   display: block;
   width: 100%;
-  /* REMOVED: overflow: hidden; -> This caused the hover clipping! */
   margin-bottom: 12px;
   position: relative;
-  z-index: 1; /* Establishes baseline stacking context */
+  z-index: 1;
+  /* Aggressive text selection prevention */
+  -webkit-user-select: none !important;
+  user-select: none !important;
+}
+
+.masonry-item h2, .masonry-item a, .masonry-item span, .masonry-item div {
+  -webkit-user-select: none !important;
+  user-select: none !important;
 }
 
 @media (min-width: 600px) {
@@ -212,13 +201,6 @@ input {
 @media (min-width: 1600px) { .masonry-grid { grid-template-columns: repeat(6, 1fr); } }
 
 .card-hover { transition: transform 0.3s ease, box-shadow 0.3s ease !important; }
-.card-hover * {
-  -webkit-touch-callout: none !important; 
-  -webkit-user-select: none !important;   
-  -moz-user-select: none !important;      
-  -ms-user-select: none !important;       
-  user-select: none !important;           
-}
 .card-hover ::selection { background: transparent !important; color: inherit !important; }
 .card-hover ::-moz-selection { background: transparent !important; color: inherit !important; }
 .card-hover img { -webkit-user-drag: none !important; pointer-events: none; }
