@@ -23,6 +23,13 @@ const feedGrid = document.getElementById('feed-grid');
 const searchTagsContainer = document.getElementById('search-tags-container'); 
 const searchInput = document.getElementById('search-input'); 
 
+const views = {
+  '/': document.getElementById('view-home'),
+  '/search': document.getElementById('view-home'), // Search and Home use the same view container now
+  '/add': document.getElementById('view-add'),
+  '/profile': document.getElementById('view-profile')
+};
+
 const navLinks = document.querySelectorAll('.nav-link');
 const navIndicator = document.getElementById('nav-indicator');
 const bottomNav = document.getElementById('bottom-nav');
@@ -268,18 +275,16 @@ function handleRoute(noAnimate = false) {
   const addView = document.getElementById('view-add');
   const profileView = document.getElementById('view-profile');
 
-  // Hide independent views by default
   if (addView) addView.style.display = 'none';
   if (profileView) profileView.style.display = 'none';
 
   if (hash === '/' || hash === '/search') {
     if (homeView) {
       homeView.style.display = 'block';
-      homeView.style.animation = 'none'; // Prevent fade-in flash on grid
+      homeView.style.animation = 'none'; 
     }
 
     if (hash === '/') {
-      // Home selected: Smoothly collapse search bar and reset filters
       if (searchHeader) {
         searchHeader.classList.remove('search-header-expanded');
         searchHeader.classList.add('search-header-collapsed');
@@ -288,19 +293,17 @@ function handleRoute(noAnimate = false) {
       selectedSearchTag = null;
       if (searchInput) searchInput.value = '';
       renderSearchTags();
-      renderSearchFeed(); // Instantly show all cards
+      renderSearchFeed(); 
     } else if (hash === '/search') {
-      // Search selected: Smoothly expand search bar and focus it
       if (searchHeader) {
         searchHeader.classList.remove('search-header-collapsed');
         searchHeader.classList.add('search-header-expanded');
       }
       if (!noAnimate && searchInput) {
-        setTimeout(() => searchInput.focus(), 400);
+        setTimeout(() => searchInput.focus(), 300);
       }
     }
   } else {
-    // Add or Profile views selected
     if (homeView) homeView.style.display = 'none';
     const activeView = hash === '/add' ? addView : profileView;
     if (activeView) {
