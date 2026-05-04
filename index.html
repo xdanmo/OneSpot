@@ -11,6 +11,15 @@
 <body>
   <div class="app-container">
     <main class="feed-container" id="view-home">
+      <!-- NEW: Search Bar -->
+      <div style="max-width: 600px; margin: 0 auto 24px; position: relative;">
+        <span class="material-symbols-outlined" style="position: absolute; left: 16px; top: 50%; transform: translateY(-50%); color: var(--outline-variant); pointer-events: none;">search</span>
+        <input type="text" id="search-input" placeholder="Search your spots by title, tag, or link..." class="font-body-md shadow-ambient"
+          style="width: 100%; background-color: var(--surface-container-highest); border: 1px solid var(--tertiary-fixed-dim); border-radius: var(--rounded-full); padding: 14px 16px 14px 48px; color: var(--on-surface); outline: none; transition: all 0.2s;"
+          onfocus="this.style.borderColor='var(--primary)'; this.style.boxShadow='0 0 0 1px var(--primary)';"
+          onblur="this.style.borderColor='var(--tertiary-fixed-dim)'; this.style.boxShadow='none';" />
+      </div>
+
       <div class="masonry-grid" id="feed-grid"></div>
     </main>
 
@@ -36,6 +45,7 @@
           Drive</button>
       </div>
     </main>
+    
     <main class="container" id="view-add"
       style="display: none; padding-top: var(--spacing-xl); max-width: 672px; padding-bottom: 120px; margin: 0 auto;">
       <div style="display: flex; flex-direction: column; gap: var(--spacing-md);">
@@ -162,6 +172,9 @@
       <div id="detail-content" style="padding: 0 20px calc(48px + env(safe-area-inset-bottom)); overflow: hidden;">
       </div>
     </div>
+
+    <!-- NEW: Toast Container -->
+    <div id="toast-container" style="position: fixed; bottom: 100px; left: 50%; transform: translateX(-50%); z-index: 1000; display: flex; flex-direction: column; gap: 8px; pointer-events: none;"></div>
 
     <div id="auth-overlay"
       style="position: fixed; inset: 0; background-color: var(--background); z-index: 200; display: flex; flex-direction: column; align-items: center; justify-content: center;">
