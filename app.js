@@ -15,22 +15,20 @@ let lastSelectionTime = 0;
 let searchQuery = ''; 
 let selectedSearchTag = null; 
 let isDetailSheetOpen = false;
-let editingId = null; 
-let currentDetailId = null; 
+let editingId = null; // Track if we are editing an entry
+let currentDetailId = null; // Track which entry is open in detail sheet
 
 // DOM Elements
 const authOverlay = document.getElementById('auth-overlay');
 const btnLogin = document.getElementById('btn-login');
 const authStatus = document.getElementById('auth-status');
 const feedGrid = document.getElementById('feed-grid');
-const searchFeedGrid = document.getElementById('search-feed-grid'); // Separated Search Grid
 const searchTagsContainer = document.getElementById('search-tags-container'); 
 const searchInput = document.getElementById('search-input'); 
-const searchHeader = document.getElementById('search-header');
 
 const views = {
   '/': document.getElementById('view-home'),
-  '/search': document.getElementById('view-search'), // Restored isolated view-search
+  '/search': document.getElementById('view-home'), 
   '/add': document.getElementById('view-add'),
   '/profile': document.getElementById('view-profile')
 };
@@ -60,12 +58,12 @@ function showToast(message) {
   navToast.textContent = message;
   navToast.style.opacity = '1';
   if (navIndicator) navIndicator.style.opacity = '0';
-  navLinks.forEach(l => l.style.opacity = '0'); 
+  navLinks.forEach(l => l.style.opacity = '0'); // Fade out icons
   
   setTimeout(() => {
     navToast.style.opacity = '0';
     if (navIndicator) navIndicator.style.opacity = '1';
-    navLinks.forEach(l => l.style.opacity = '1'); 
+    navLinks.forEach(l => l.style.opacity = '1'); // Fade back icons
   }, 3000);
 }
 
@@ -135,10 +133,7 @@ function maybeEnableButtons() {
       try {
         const tokenInfo = JSON.parse(saved);
         if (Date.now() > tokenInfo.expires_at) {
-           console.log("Token expired, requiring manual re-auth.");
-           localStorage.removeItem('onespot_token');
-           authStatus.style.display = 'none';
-           btnLogin.style.display = 'block';
+           tokenClient.requestAccessToken({ prompt: '' }); 
            return;
         }
         gapi.client.setToken(tokenInfo);
@@ -221,9 +216,7 @@ async function initializeDrive() {
   } catch (err) {
     console.error('Drive API Error:', err);
     if (err.status === 401 || (err.result && err.result.error && err.result.error.code === 401)) {
-      localStorage.removeItem('onespot_token');
-      authStatus.style.display = 'none';
-      btnLogin.style.display = 'block';
+      tokenClient.requestAccessToken({ prompt: '' });
       return;
     } else {
       showToast('Failed to connect to Drive. Please try again.');
@@ -275,7 +268,9 @@ function handleRoute(noAnimate = false) {
   if (typeof noAnimate !== 'boolean') noAnimate = false;
   
   const hash = window.location.hash.replace('#', '') || '/';
+  const searchHeader = document.getElementById('search-header');
 
+  // Cancel edit mode if user navigates away from Add tab
   if (hash !== '/add' && editingId) {
     editingId = null;
     btnSaveEntry.textContent = 'Save Entry';
@@ -283,9 +278,10 @@ function handleRoute(noAnimate = false) {
     renderAddPreview(); renderTags();
   }
 
+  // FIX: Reset scroll position to top instantly to prevent layout glitch during view swap
   window.scrollTo({ top: 0, behavior: 'instant' });
 
-  // Strictly isolate all views
+  // Strictly hide all views immediately
   Object.values(views).forEach(v => {
     if (v) {
       v.style.display = 'none';
@@ -295,42 +291,37 @@ function handleRoute(noAnimate = false) {
 
   const activeView = views[hash] || views['/'];
 
-  if (activeView) {
-    activeView.style.display = 'block';
-    
-    // Animate Search tab specifically
-    if (hash === '/search') {
+  if (hash === '/' || hash === '/search') {
+    if (activeView) activeView.style.display = 'block';
+
+    if (hash === '/') {
       if (searchHeader) {
         searchHeader.classList.remove('search-header-expanded');
         searchHeader.classList.add('search-header-collapsed');
-        
-        // Slight delay to let the grid render, then drop the search bar smoothly
-        setTimeout(() => {
-          searchHeader.classList.remove('search-header-collapsed');
-          searchHeader.classList.add('search-header-expanded');
-          setTimeout(setMasonrySpans, 400); // Recalculate after drop finishes
-        }, 50);
       }
-    } 
-    // Animate Add/Profile views
-    else if (hash === '/add' || hash === '/profile') {
-      void activeView.offsetWidth;
-      if (!noAnimate) activeView.style.animation = 'fade-in-up 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) forwards';
-    } 
-    // Reset Search data if going back to Home
-    else if (hash === '/') {
       searchQuery = '';
       selectedSearchTag = null;
       if (searchInput) searchInput.value = '';
       renderSearchTags();
       renderSearchFeed(); 
+    } else if (hash === '/search') {
+      if (searchHeader) {
+        searchHeader.classList.remove('search-header-collapsed');
+        searchHeader.classList.add('search-header-expanded');
+      }
     }
-
-    // Crucial: Calculate masonry spans immediately upon making a view block
-    setMasonrySpans();
+  } else {
+    if (activeView) {
+      activeView.style.display = 'block';
+      void activeView.offsetWidth;
+      if (!noAnimate) {
+        activeView.style.animation = 'fade-in-up 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) forwards';
+      }
+    }
   }
 
   updateNavIndicator(hash, noAnimate);
+  setTimeout(setMasonrySpans, 50);
 }
 
 function updateNavIndicator(hash, noAnimate = false) {
@@ -369,29 +360,18 @@ function updateNavIndicator(hash, noAnimate = false) {
   }
 }
 
-// --- DOM BATCHING ENGINE (Fixes Layout Thrashing & Hard Refresh Glitch) ---
 function setMasonrySpans() {
   const rowSize = 4;
-  
-  // Only measure items that are currently painted by the browser
-  const items = Array.from(document.querySelectorAll('.masonry-item')).filter(item => {
-    return item.offsetParent !== null && item.style.display !== 'none';
-  });
-  
-  if (items.length === 0) return;
-
-  items.forEach(item => item.style.gridRowEnd = '');
-
-  const heights = items.map(item => {
+  document.querySelectorAll('.masonry-item').forEach(item => {
+    item.style.gridRowEnd = '';
     const article = item.children[0];
-    return article ? article.getBoundingClientRect().height : 0;
-  });
-
-  const marginBottom = parseFloat(window.getComputedStyle(items[0]).marginBottom) || 12;
-
-  items.forEach((item, i) => {
-    if (heights[i] > 0) {
-      const spans = Math.ceil((heights[i] + marginBottom) / rowSize);
+    if (!article) return;
+    
+    const contentHeight = article.getBoundingClientRect().height;
+    const marginBottom = parseFloat(window.getComputedStyle(item).marginBottom) || 12;
+    
+    if (contentHeight > 0) {
+      const spans = Math.ceil((contentHeight + marginBottom) / rowSize);
       item.style.gridRowEnd = `span ${spans}`;
     }
   });
@@ -553,21 +533,13 @@ function createCardElement(item) {
 }
 
 function renderFeed() {
-  if (feedGrid) feedGrid.innerHTML = '';
-  if (searchFeedGrid) searchFeedGrid.innerHTML = '';
-  
+  feedGrid.innerHTML = '';
   updateAvailableTags();
-
-  // Populate both separated grids natively
-  entries.forEach(item => {
-    if (feedGrid) feedGrid.appendChild(createCardElement(item));
-    if (searchFeedGrid) searchFeedGrid.appendChild(createCardElement(item));
-  });
+  entries.forEach(item => feedGrid.appendChild(createCardElement(item)));
 
   renderTags(); 
   renderSearchTags(); 
   renderSearchFeed();
-
   applySelectionStyles();
 
   requestAnimationFrame(() => {
@@ -582,9 +554,8 @@ function renderFeed() {
 }
 
 function renderSearchFeed() {
-  if (!searchFeedGrid) return;
   const query = searchQuery.toLowerCase();
-  const items = searchFeedGrid.querySelectorAll('.masonry-item');
+  const items = feedGrid.querySelectorAll('.masonry-item');
   let visibleCount = 0;
 
   items.forEach(itemDiv => {
@@ -612,14 +583,14 @@ function renderSearchFeed() {
     }
   });
 
-  let noResultsMsg = searchFeedGrid.querySelector('.no-results-msg');
+  let noResultsMsg = feedGrid.querySelector('.no-results-msg');
   if (visibleCount === 0) {
     if (!noResultsMsg) {
       noResultsMsg = document.createElement('p');
       noResultsMsg.className = 'no-results-msg font-body-md';
       noResultsMsg.style.cssText = 'grid-column: 1 / -1; text-align: center; color: var(--outline); margin-top: 40px;';
       noResultsMsg.textContent = 'No entries found.';
-      searchFeedGrid.appendChild(noResultsMsg);
+      feedGrid.appendChild(noResultsMsg);
     }
     noResultsMsg.style.display = 'block';
   } else if (noResultsMsg) {
@@ -627,7 +598,7 @@ function renderSearchFeed() {
   }
 
   applySelectionStyles();
-  setMasonrySpans();
+  scheduleMasonryUpdate();
 }
 
 function applySelectionStyles() {
@@ -656,21 +627,22 @@ function updateSelectionState() {
   applySelectionStyles();
 
   if (selectedIds.length > 0) {
-    bottomNav.style.transform = 'translateY(150%)'; 
+    bottomNav.style.transform = 'translateY(150%)'; // Slide out nav
     selectionBar.style.display = 'flex';
     
+    // Tiny delay so the slide feels physical
     setTimeout(() => {
-      selectionBar.style.transform = 'translateY(0)'; 
+      selectionBar.style.transform = 'translateY(0)'; // Slide in selection bar
     }, 50);
 
     selectionCount.textContent = `${selectedIds.length} Selected`;
     if (btnEdit) btnEdit.style.display = selectedIds.length === 1 ? 'block' : 'none';
   } else {
-    selectionBar.style.transform = 'translateY(150%)'; 
+    selectionBar.style.transform = 'translateY(150%)'; // Slide out selection bar
     
     setTimeout(() => {
       selectionBar.style.display = 'none';
-      bottomNav.style.transform = 'translateY(0)'; 
+      bottomNav.style.transform = 'translateY(0)'; // Slide in nav
       updateNavIndicator(window.location.hash.replace('#', '') || '/', true);
     }, 200);
   }
@@ -687,7 +659,7 @@ window.addEventListener('popstate', (e) => {
 
 function openDetailSheet(item, preloadedSrc = null) {
   isDetailSheetOpen = true;
-  currentDetailId = item.id; 
+  currentDetailId = item.id; // Store ID for editing
   history.pushState({ modal: true }, ''); 
 
   let imgHtml = '';
@@ -753,20 +725,16 @@ function startEditMode(id) {
   editingId = id;
   addText.value = entry.title || '';
   addLink.value = entry.url || '';
+  addImageUrl = entry.image || '';
   addImageAspectRatio = entry.aspectRatio || '100%';
   addTags = entry.tags ? [...entry.tags] : [];
+  
   pendingImageFile = null;
   addImage.value = ''; 
 
-  if (entry.image) {
-    const existingCard = document.querySelector(`article[data-id="${id}"] img`);
-    addImageUrl = existingCard ? existingCard.src : entry.image;
-  } else {
-    addImageUrl = '';
-  }
-
   btnSaveEntry.textContent = 'Update Entry';
   
+  // Close any open sheets/bars
   if (isDetailSheetOpen) closeDetailSheet(false);
   if (selectedIds.length > 0) {
     selectedIds = [];
@@ -788,6 +756,11 @@ btnSheetEdit.addEventListener('click', () => {
 
 
 // --- Add Entry Logic ---
+let addTags = [];
+let addImageUrl = '';
+let addImageAspectRatio = '100%';
+let pendingImageFile = null;
+
 const addText = document.getElementById('add-text');
 const addLink = document.getElementById('add-link');
 const addImage = document.getElementById('add-image');
@@ -811,6 +784,7 @@ function renderAddPreview() {
       </article>
     `;
   } else {
+    // Determine preview image source carefully so it works with Drive permalinks during edit
     let previewSrc = addImageUrl;
     let driveId = '';
     const ucMatch = addImageUrl.match(/[?&]id=([^&]+)/);
@@ -971,9 +945,7 @@ btnSaveEntry.addEventListener('click', async () => {
       if (index !== -1) {
         entries[index].title = addText.value;
         entries[index].url = addLink.value;
-        if (finalImageUrl && !finalImageUrl.startsWith('blob:')) {
-          entries[index].image = finalImageUrl;
-        }
+        entries[index].image = finalImageUrl;
         entries[index].aspectRatio = addImageAspectRatio;
         entries[index].tags = [...addTags];
         entries[index].type = addTags[0] || 'Note';
@@ -994,6 +966,7 @@ btnSaveEntry.addEventListener('click', async () => {
 
     await saveDataToDrive();
 
+    // Reset Form
     addText.value = ''; addLink.value = ''; addImage.value = ''; addImageUrl = ''; 
     pendingImageFile = null; addTags = []; editingId = null;
     btnSaveEntry.textContent = 'Save Entry';
@@ -1017,6 +990,11 @@ renderAddPreview();
 renderTags();
 
 // --- Bind Global Events ---
+window.addEventListener('hashchange', handleRoute);
+
+let lastWindowWidth = window.innerWidth;
+let resizeTimer;
+
 window.addEventListener('resize', () => {
   clearTimeout(resizeTimer);
   resizeTimer = setTimeout(() => {
