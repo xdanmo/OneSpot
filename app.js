@@ -116,14 +116,7 @@ window.onload = function () {
   gisInited = true;
   maybeEnableButtons();
 
-  setTimeout(() => handleRoute(true), 150);
-  setTimeout(() => handleRoute(true), 500); 
-
-  // FIX 1: Robust ResizeObserver guarantees the grid never stacks on hard refresh
-  if (feedGrid) {
-    const gridObserver = new ResizeObserver(() => scheduleMasonryUpdate());
-    gridObserver.observe(feedGrid);
-  }
+  handleRoute(true);
 };
 
 async function initGoogleDriveClient() {
@@ -317,7 +310,6 @@ function handleRoute(noAnimate = false) {
         searchHeader.classList.remove('search-header-collapsed');
         searchHeader.classList.add('search-header-expanded');
       }
-      // FIX 2: Explicitly render search tags while expanding so browser paints them correctly
       renderSearchTags();
     }
   } else {
@@ -331,7 +323,9 @@ function handleRoute(noAnimate = false) {
   }
 
   updateNavIndicator(hash, noAnimate);
-  setTimeout(setMasonrySpans, 50);
+  
+  // Update spans instantly to avoid visual tearing on tab switch
+  setMasonrySpans();
 }
 
 function updateNavIndicator(hash, noAnimate = false) {
@@ -370,27 +364,38 @@ function updateNavIndicator(hash, noAnimate = false) {
   }
 }
 
+// --- DOM BATCHING ENGINE (Fixes the lag and stuttering!) ---
 function setMasonrySpans() {
   const rowSize = 4;
-  document.querySelectorAll('.masonry-item').forEach(item => {
-    item.style.gridRowEnd = '';
+  const items = Array.from(document.querySelectorAll('.masonry-item')).filter(item => item.style.display !== 'none');
+  
+  if (items.length === 0) return;
+
+  // 1. Batch Write: Reset all spans first
+  items.forEach(item => item.style.gridRowEnd = '');
+
+  // 2. Batch Read: Gather all natural heights (Forces exactly ONE layout reflow)
+  const heights = items.map(item => {
     const article = item.children[0];
-    if (!article) return;
-    
-    const contentHeight = article.getBoundingClientRect().height;
-    const marginBottom = parseFloat(window.getComputedStyle(item).marginBottom) || 12;
-    
-    if (contentHeight > 0) {
-      const spans = Math.ceil((contentHeight + marginBottom) / rowSize);
+    return article ? article.getBoundingClientRect().height : 0;
+  });
+
+  // 3. Batch Read: Get margin safely once
+  const marginBottom = parseFloat(window.getComputedStyle(items[0]).marginBottom) || 12;
+
+  // 4. Batch Write: Apply all calculated spans simultaneously
+  items.forEach((item, i) => {
+    if (heights[i] > 0) {
+      const spans = Math.ceil((heights[i] + marginBottom) / rowSize);
       item.style.gridRowEnd = `span ${spans}`;
     }
   });
 }
 
-let masonryTimeout = null;
+let masonryFrame = null;
 function scheduleMasonryUpdate() {
-  clearTimeout(masonryTimeout);
-  masonryTimeout = setTimeout(setMasonrySpans, 100);
+  if (masonryFrame) cancelAnimationFrame(masonryFrame);
+  masonryFrame = requestAnimationFrame(() => setMasonrySpans());
 }
 
 let availableTags = [];
@@ -550,19 +555,16 @@ function renderFeed() {
   renderTags(); 
   renderSearchTags(); 
   renderSearchFeed();
-  applySelectionStyles();
 
-  // FIX 1: Robust timeout chain ensures height triggers even on delayed layouts
-  requestAnimationFrame(() => {
-    setMasonrySpans();
-    setTimeout(setMasonrySpans, 150);
-    setTimeout(setMasonrySpans, 500);
-    document.querySelectorAll('img').forEach(img => {
-      if (!img.complete) {
-        img.addEventListener('load', scheduleMasonryUpdate, { once: true });
-        img.addEventListener('error', scheduleMasonryUpdate, { once: true });
-      }
-    });
+  // Instant layout application
+  setMasonrySpans();
+
+  // Listeners for deferred image loads
+  document.querySelectorAll('img').forEach(img => {
+    if (!img.complete) {
+      img.addEventListener('load', scheduleMasonryUpdate, { once: true });
+      img.addEventListener('error', scheduleMasonryUpdate, { once: true });
+    }
   });
 }
 
@@ -611,7 +613,7 @@ function renderSearchFeed() {
   }
 
   applySelectionStyles();
-  scheduleMasonryUpdate();
+  setMasonrySpans(); // Synchronous layout calculation
 }
 
 function applySelectionStyles() {
