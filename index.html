@@ -20,10 +20,10 @@
           <div class="search-content">
             <div style="max-width: 600px; margin: 0 auto 16px; position: relative;">
               <span class="material-symbols-outlined" style="position: absolute; left: 16px; top: 50%; transform: translateY(-50%); color: var(--outline-variant); pointer-events: none;">search</span>
-              <input type="text" id="search-input" placeholder="Search by title or link..." class="font-body-md shadow-ambient"
-                style="width: 100%; background-color: var(--surface-container-highest); border: 1px solid var(--tertiary-fixed-dim); border-radius: var(--rounded-full); padding: 14px 16px 14px 48px; color: var(--on-surface); outline: none; transition: all 0.2s;"
-                onfocus="this.style.borderColor='var(--primary)'; this.style.boxShadow='0 0 0 1px var(--primary)';"
-                onblur="this.style.borderColor='var(--tertiary-fixed-dim)'; this.style.boxShadow='none';" />
+              <input type="text" id="search-input" placeholder="Search by title or link..." class="font-body-md"
+                style="width: 100%; background-color: var(--surface-container-low); border: 1px solid transparent; border-radius: var(--rounded-full); padding: 14px 16px 14px 48px; color: var(--on-surface); outline: none; transition: all 0.2s;"
+                onfocus="this.style.backgroundColor='var(--surface-container)'; this.style.borderColor='var(--outline-variant)';"
+                onblur="this.style.backgroundColor='var(--surface-container-low)'; this.style.borderColor='transparent';" />
             </div>
             
             <!-- Horizontal Scrollable Tags -->
@@ -38,7 +38,7 @@
     </main>
 
     <main class="container" id="view-profile"
-      style="display: none; padding-top: var(--spacing-xl); text-align: center; max-width: 600px; margin: 0 auto;">
+      style="display: none; padding-top: var(--spacing-xl); text-align: center; max-width: 600px; margin: 0 auto; min-height: 100dvh; background-color: var(--background);">
       <div
         style="background-color: var(--surface-container-low); border: 1px solid var(--tertiary-fixed-dim); border-radius: var(--rounded-xl); padding: 32px 24px; display: flex; flex-direction: column; align-items: center; gap: 16px;"
         class="shadow-ambient">
@@ -62,7 +62,7 @@
     
     <!-- Redesigned Add Tab -->
     <main class="container" id="view-add"
-      style="display: none; padding-top: var(--spacing-lg); max-width: 500px; padding-bottom: 120px; margin: 0 auto;">
+      style="display: none; padding-top: var(--spacing-lg); max-width: 500px; padding-bottom: 120px; margin: 0 auto; min-height: 100dvh; background-color: var(--background);">
       
       <div style="margin-bottom: var(--spacing-lg); width: 100%;" id="add-preview-container"></div>
 
@@ -116,11 +116,10 @@
 
     <!-- Selection Bar -->
     <div id="selection-bar"
-      style="display: none; position: fixed; bottom: 32px; left: 0; right: 0; justify-content: center; align-items: center; z-index: 99999;">
+      style="display: flex; transform: translateY(150%); transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1); position: fixed; bottom: 32px; left: 0; right: 0; justify-content: center; align-items: center; z-index: 99999;">
       <div class="shadow-nav"
         style="position: relative; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 16px; border-radius: var(--rounded-full); min-width: 280px; background-color: rgba(242, 240, 235, 0.95); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.5);">
-        <span class="font-label-md" style="color: var(--on-surface); margin-left: 8px;" id="selection-count">0
-          Selected</span>
+        <span class="font-label-md" style="color: var(--on-surface); margin-left: 8px;" id="selection-count">0 Selected</span>
         <div style="display: flex; align-items: center; gap: 12px;">
           <button id="btn-edit" class="font-label-sm"
             style="background-color: var(--surface-container); color: var(--on-surface); border: 1px solid var(--outline-variant); border-radius: var(--rounded-full); padding: 8px 16px; cursor: pointer; display: none;">Edit</button>
@@ -137,26 +136,30 @@
 
     <!-- Bottom Nav -->
     <div id="bottom-nav"
-      style="position: fixed; bottom: 32px; left: 0; right: 0; display: flex; justify-content: center; align-items: center; z-index: 99999;">
+      style="position: fixed; transform: translateY(0); transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1); bottom: 32px; left: 0; right: 0; display: flex; justify-content: center; align-items: center; z-index: 99999;">
       <nav id="nav-container"
-        style="position: relative; display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 12px 16px; border-radius: var(--rounded-full); min-width: 280px; background-color: rgba(242, 240, 235, 0.6); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.5);">
+        style="position: relative; display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 12px 16px; border-radius: var(--rounded-full); min-width: 280px; background-color: rgba(242, 240, 235, 0.85); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); border: 1px solid rgba(255, 255, 255, 0.5); overflow: hidden;">
+        
+        <!-- Dynamic Island Toast -->
+        <div id="nav-toast" class="font-label-sm" style="position: absolute; inset: 0; background-color: var(--inverse-surface); color: var(--inverse-on-surface); display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: opacity 0.3s ease; z-index: 10;"></div>
+
         <div id="nav-indicator"
           style="position: absolute; left: 0; top: 0; width: 0; height: 0; background-color: var(--primary); border-radius: var(--rounded-full); opacity: 0; transition: none; z-index: 0;">
         </div>
         <a href="#/" class="nav-link" data-index="0"
-          style="position: relative; z-index: 1; display: flex; align-items: center; justify-content: center; padding: 16px; border-radius: var(--rounded-full); transition: color 0.5s ease, transform 0.5s ease; color: var(--outline);">
+          style="position: relative; z-index: 1; display: flex; align-items: center; justify-content: center; padding: 16px; border-radius: var(--rounded-full); transition: color 0.5s ease, transform 0.5s ease, opacity 0.3s ease; color: var(--outline);">
           <span class="material-symbols-outlined">home</span>
         </a>
         <a href="#/search" class="nav-link" data-index="1"
-          style="position: relative; z-index: 1; display: flex; align-items: center; justify-content: center; padding: 16px; border-radius: var(--rounded-full); transition: color 0.5s ease, transform 0.5s ease; color: var(--outline);">
+          style="position: relative; z-index: 1; display: flex; align-items: center; justify-content: center; padding: 16px; border-radius: var(--rounded-full); transition: color 0.5s ease, transform 0.5s ease, opacity 0.3s ease; color: var(--outline);">
           <span class="material-symbols-outlined">search</span>
         </a>
         <a href="#/add" class="nav-link" data-index="2"
-          style="position: relative; z-index: 1; display: flex; align-items: center; justify-content: center; padding: 16px; border-radius: var(--rounded-full); transition: color 0.5s ease, transform 0.5s ease; color: var(--outline);">
+          style="position: relative; z-index: 1; display: flex; align-items: center; justify-content: center; padding: 16px; border-radius: var(--rounded-full); transition: color 0.5s ease, transform 0.5s ease, opacity 0.3s ease; color: var(--outline);">
           <span class="material-symbols-outlined">add</span>
         </a>
         <a href="#/profile" class="nav-link" data-index="3"
-          style="position: relative; z-index: 1; display: flex; align-items: center; justify-content: center; padding: 16px; border-radius: var(--rounded-full); transition: color 0.5s ease, transform 0.5s ease; color: var(--outline);">
+          style="position: relative; z-index: 1; display: flex; align-items: center; justify-content: center; padding: 16px; border-radius: var(--rounded-full); transition: color 0.5s ease, transform 0.5s ease, opacity 0.3s ease; color: var(--outline);">
           <span class="material-symbols-outlined">person</span>
         </a>
       </nav>
@@ -185,9 +188,6 @@
       <div id="detail-content" style="padding: 0 20px calc(48px + env(safe-area-inset-bottom)); overflow: hidden;">
       </div>
     </div>
-
-    <!-- Toast Container (Now overlays bottom nav) -->
-    <div id="toast-container" style="position: fixed; bottom: 32px; left: 0; right: 0; z-index: 999999; display: flex; flex-direction: column; align-items: center; gap: 8px; pointer-events: none;"></div>
 
     <div id="auth-overlay"
       style="position: fixed; inset: 0; background-color: var(--background); z-index: 200000; display: flex; flex-direction: column; align-items: center; justify-content: center;">
