@@ -14,7 +14,9 @@ let isInitialRender = true;
 let lastSelectionTime = 0;
 let searchQuery = ''; 
 let selectedSearchTag = null; 
-let isDetailSheetOpen = false; // State for Hardware Back Button
+let isDetailSheetOpen = false;
+let editingId = null; // Track if we are editing an entry
+let currentDetailId = null; // Track which entry is open in detail sheet
 
 // DOM Elements
 const authOverlay = document.getElementById('auth-overlay');
@@ -37,31 +39,31 @@ const bottomNav = document.getElementById('bottom-nav');
 const selectionBar = document.getElementById('selection-bar');
 const selectionCount = document.getElementById('selection-count');
 const btnDelete = document.getElementById('btn-delete');
+const btnEdit = document.getElementById('btn-edit');
 const btnCloseSelection = document.getElementById('btn-close-selection');
 
 const detailSheet = document.getElementById('detail-sheet');
 const detailBackdrop = document.getElementById('detail-backdrop');
 const detailContent = document.getElementById('detail-content');
 const btnSheetClose = document.getElementById('btn-sheet-close');
+const btnSheetEdit = document.getElementById('btn-sheet-edit');
 
-// --- Global Toast Notification (Now styled to overlay bottom nav) ---
+// --- Dynamic Island Toast Notification ---
 function showToast(message) {
-  const container = document.getElementById('toast-container');
-  const toast = document.createElement('div');
-  toast.className = 'font-label-sm shadow-lg';
-  toast.style.cssText = 'background-color: var(--inverse-surface); color: var(--inverse-on-surface); padding: 16px 24px; border-radius: var(--rounded-full); opacity: 0; transform: translateY(20px); transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); box-shadow: 0 10px 30px rgba(0,0,0,0.3);';
-  toast.textContent = message;
-  container.appendChild(toast);
+  const navToast = document.getElementById('nav-toast');
+  const navIndicator = document.getElementById('nav-indicator');
   
-  requestAnimationFrame(() => {
-    toast.style.opacity = '1';
-    toast.style.transform = 'translateY(0)';
-  });
-
+  if (!navToast) return;
+  
+  navToast.textContent = message;
+  navToast.style.opacity = '1';
+  if (navIndicator) navIndicator.style.opacity = '0';
+  navLinks.forEach(l => l.style.opacity = '0'); // Fade out icons
+  
   setTimeout(() => {
-    toast.style.opacity = '0';
-    toast.style.transform = 'translateY(20px)';
-    setTimeout(() => toast.remove(), 300);
+    navToast.style.opacity = '0';
+    if (navIndicator) navIndicator.style.opacity = '1';
+    navLinks.forEach(l => l.style.opacity = '1'); // Fade back icons
   }, 3000);
 }
 
@@ -102,9 +104,7 @@ window.onload = function () {
     client_id: CLIENT_ID,
     scope: SCOPES,
     callback: async (response) => {
-      if (response.error !== undefined) {
-        throw (response);
-      }
+      if (response.error !== undefined) throw (response);
       const tokenInfo = Object.assign({}, response, {
         expires_at: Date.now() + (response.expires_in * 1000)
       });
@@ -116,7 +116,6 @@ window.onload = function () {
   gisInited = true;
   maybeEnableButtons();
 
-  // Failsafe: Snap nav indicator exactly into place after fonts/layout resolve
   setTimeout(() => handleRoute(true), 150);
   setTimeout(() => handleRoute(true), 500); 
 };
@@ -133,9 +132,8 @@ function maybeEnableButtons() {
     if (saved) {
       try {
         const tokenInfo = JSON.parse(saved);
-        // FOREVER LOGIN FIX: Check if token is expired, do a silent refresh if true
         if (Date.now() > tokenInfo.expires_at) {
-           tokenClient.requestAccessToken({ prompt: '' }); // Silent refresh
+           tokenClient.requestAccessToken({ prompt: '' }); 
            return;
         }
         gapi.client.setToken(tokenInfo);
@@ -218,7 +216,6 @@ async function initializeDrive() {
   } catch (err) {
     console.error('Drive API Error:', err);
     if (err.status === 401 || (err.result && err.result.error && err.result.error.code === 401)) {
-      // FOREVER LOGIN FIX: Attempt silent token refresh instead of kicking user out instantly
       tokenClient.requestAccessToken({ prompt: '' });
       return;
     } else {
@@ -262,7 +259,6 @@ async function uploadImageToDrive(file) {
   });
 
   authOverlay.style.display = 'none';
-  
   return `https://googleusercontent.com/profile/picture/0${data.id}`;
 }
 
@@ -272,20 +268,31 @@ function handleRoute(noAnimate = false) {
   if (typeof noAnimate !== 'boolean') noAnimate = false;
   
   const hash = window.location.hash.replace('#', '') || '/';
-  
   const searchHeader = document.getElementById('search-header');
-  const homeView = document.getElementById('view-home');
-  const addView = document.getElementById('view-add');
-  const profileView = document.getElementById('view-profile');
 
-  if (addView) addView.style.display = 'none';
-  if (profileView) profileView.style.display = 'none';
+  // Cancel edit mode if user navigates away from Add tab
+  if (hash !== '/add' && editingId) {
+    editingId = null;
+    btnSaveEntry.textContent = 'Save Entry';
+    addText.value = ''; addLink.value = ''; addImage.value = ''; addImageUrl = ''; addTags = [];
+    renderAddPreview(); renderTags();
+  }
+
+  // FIX: Reset scroll position to top instantly to prevent layout glitch during view swap
+  window.scrollTo({ top: 0, behavior: 'instant' });
+
+  // Strictly hide all views immediately
+  Object.values(views).forEach(v => {
+    if (v) {
+      v.style.display = 'none';
+      v.style.animation = 'none'; 
+    }
+  });
+
+  const activeView = views[hash] || views['/'];
 
   if (hash === '/' || hash === '/search') {
-    if (homeView) {
-      homeView.style.display = 'block';
-      homeView.style.animation = 'none'; 
-    }
+    if (activeView) activeView.style.display = 'block';
 
     if (hash === '/') {
       if (searchHeader) {
@@ -304,8 +311,6 @@ function handleRoute(noAnimate = false) {
       }
     }
   } else {
-    if (homeView) homeView.style.display = 'none';
-    const activeView = hash === '/add' ? addView : profileView;
     if (activeView) {
       activeView.style.display = 'block';
       void activeView.offsetWidth;
@@ -398,14 +403,14 @@ function renderSearchTags() {
     btn.className = 'font-label-sm shadow-ambient';
     btn.textContent = tag;
     btn.style.cssText = `
-      background-color: ${isSelected ? 'var(--primary)' : 'var(--surface-container-highest)'}; 
+      background-color: ${isSelected ? 'var(--primary)' : 'var(--surface-container-low)'}; 
       color: ${isSelected ? 'var(--on-primary)' : 'var(--on-surface)'}; 
-      border: 1px solid ${isSelected ? 'var(--primary)' : 'var(--tertiary-fixed-dim)'}; 
+      border: 1px solid transparent; 
       border-radius: var(--rounded-full); 
       padding: 8px 16px; 
       cursor: pointer; 
       transition: all 0.2s;
-      flex-shrink: 0; /* Prevents tags from squishing in horizontal scroll */
+      flex-shrink: 0;
     `;
     
     btn.onclick = () => {
@@ -517,7 +522,6 @@ function createCardElement(item) {
         return;
       }
       
-      // INSTANT PREVIEW FIX: Grab the currently loaded image src directly from the screen
       const clickedImg = article.querySelector('img');
       const loadedSrc = clickedImg ? clickedImg.src : null;
       openDetailSheet(item, loadedSrc);
@@ -621,29 +625,33 @@ function applySelectionStyles() {
 
 function updateSelectionState() {
   applySelectionStyles();
-  bottomNav.style.transition = 'opacity 0.2s ease';
 
   if (selectedIds.length > 0) {
-    bottomNav.style.opacity = '0';
-    bottomNav.style.pointerEvents = 'none';
+    bottomNav.style.transform = 'translateY(150%)'; // Slide out nav
     selectionBar.style.display = 'flex';
+    
+    // Tiny delay so the slide feels physical
+    setTimeout(() => {
+      selectionBar.style.transform = 'translateY(0)'; // Slide in selection bar
+    }, 50);
+
     selectionCount.textContent = `${selectedIds.length} Selected`;
-    const btnEdit = document.getElementById('btn-edit');
     if (btnEdit) btnEdit.style.display = selectedIds.length === 1 ? 'block' : 'none';
   } else {
-    bottomNav.style.opacity = '1';
-    bottomNav.style.pointerEvents = 'auto';
-    selectionBar.style.display = 'none';
-    updateNavIndicator(window.location.hash.replace('#', '') || '/', true);
+    selectionBar.style.transform = 'translateY(150%)'; // Slide out selection bar
+    
+    setTimeout(() => {
+      selectionBar.style.display = 'none';
+      bottomNav.style.transform = 'translateY(0)'; // Slide in nav
+      updateNavIndicator(window.location.hash.replace('#', '') || '/', true);
+    }, 200);
   }
 }
 
 // --- Detail Sheet & History API ---
-
-// BACK BUTTON FIX: Handle browser back/forward routing seamlessly
 window.addEventListener('popstate', (e) => {
   if (isDetailSheetOpen) {
-    closeDetailSheet(true); // User pressed back, close sheet, don't change route
+    closeDetailSheet(true); 
   } else {
     handleRoute();
   }
@@ -651,11 +659,11 @@ window.addEventListener('popstate', (e) => {
 
 function openDetailSheet(item, preloadedSrc = null) {
   isDetailSheetOpen = true;
-  history.pushState({ modal: true }, ''); // BACK BUTTON FIX: Add virtual state for modal
+  currentDetailId = item.id; // Store ID for editing
+  history.pushState({ modal: true }, ''); 
 
   let imgHtml = '';
   if (item.image) {
-    // Use preloaded src for instant render, fallback to re-calculating if missing
     let sheetImgSource = preloadedSrc || item.image;
     let driveId = '';
     
@@ -696,18 +704,55 @@ function openDetailSheet(item, preloadedSrc = null) {
 
 function closeDetailSheet(fromHistory = false) {
   isDetailSheetOpen = false;
+  currentDetailId = null;
   detailBackdrop.style.opacity = '0';
   detailSheet.style.transform = 'translateY(100%)';
   detailBackdrop.style.pointerEvents = 'none';
   setTimeout(() => { document.body.style.overflow = ''; }, 300);
   
-  if (!fromHistory) {
-    history.back(); // If closed via X button, pop the virtual state so back button stays accurate
-  }
+  if (!fromHistory) history.back(); 
 }
 
 detailBackdrop.addEventListener('click', () => closeDetailSheet(false));
 btnSheetClose.addEventListener('click', () => closeDetailSheet(false));
+
+
+// --- Edit Entry Logic ---
+function startEditMode(id) {
+  const entry = entries.find(e => e.id === id);
+  if (!entry) return;
+
+  editingId = id;
+  addText.value = entry.title || '';
+  addLink.value = entry.url || '';
+  addImageUrl = entry.image || '';
+  addImageAspectRatio = entry.aspectRatio || '100%';
+  addTags = entry.tags ? [...entry.tags] : [];
+  
+  pendingImageFile = null;
+  addImage.value = ''; 
+
+  btnSaveEntry.textContent = 'Update Entry';
+  
+  // Close any open sheets/bars
+  if (isDetailSheetOpen) closeDetailSheet(false);
+  if (selectedIds.length > 0) {
+    selectedIds = [];
+    updateSelectionState();
+  }
+  
+  window.location.hash = '#/add';
+  renderAddPreview();
+  renderTags();
+}
+
+btnEdit.addEventListener('click', () => {
+  if (selectedIds.length === 1) startEditMode(selectedIds[0]);
+});
+
+btnSheetEdit.addEventListener('click', () => {
+  if (currentDetailId) startEditMode(currentDetailId);
+});
 
 
 // --- Add Entry Logic ---
@@ -725,7 +770,7 @@ const tagsContainer = document.getElementById('tags-container');
 const btnSaveEntry = document.getElementById('btn-save-entry');
 
 function renderAddPreview() {
-  const text = addText.value || 'Preview';
+  const text = addText.value || (editingId ? 'Edit Preview' : 'Preview');
   const link = addLink.value;
   let html = '';
 
@@ -739,10 +784,26 @@ function renderAddPreview() {
       </article>
     `;
   } else {
+    // Determine preview image source carefully so it works with Drive permalinks during edit
+    let previewSrc = addImageUrl;
+    let driveId = '';
+    const ucMatch = addImageUrl.match(/[?&]id=([^&]+)/);
+    const lh3Match = addImageUrl.match(/lh3\.googleusercontent\.com\/d\/([^/?]+)/);
+    
+    if (ucMatch) { 
+      driveId = ucMatch[1]; 
+      previewSrc = `https://googleusercontent.com/profile/picture/0${driveId}`; 
+    } else if (lh3Match) { 
+      driveId = lh3Match[1]; 
+    } else if (addImageUrl.includes('googleusercontent')) { 
+      const parts = addImageUrl.split('/0');
+      if (parts.length > 1) driveId = parts[1];
+    }
+
     html = `
       <article style="position: relative; background-color: transparent; border-radius: var(--rounded-xl); border: none;">
-        <div class="shadow-ambient" style="position: relative; width: 100%; padding-bottom: ${addImageAspectRatio}; background-color: var(--surface-container-low);">
-          <img src="${addImageUrl}" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; border-radius: var(--rounded-xl);" />
+        <div class="shadow-ambient" style="position: relative; width: 100%; padding-bottom: ${addImageAspectRatio}; background-color: var(--surface-container-low); overflow: hidden; border-radius: var(--rounded-xl);">
+          <img src="${previewSrc}" data-drive-id="${driveId || ''}" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; border-radius: var(--rounded-xl);" onerror="window.handleImageError(this)" />
           <div style="position: absolute; bottom: 0; left: 0; width: 100%; padding: 32px 12px 12px; display: flex; flex-direction: column; gap: 6px; z-index: 2;">
             ${link ? `<div class="font-body-md" style="display: flex; align-items: center; gap: 4px; color: rgba(255,255,255,0.95); font-size: 12px; text-shadow: 0 1px 4px rgba(0,0,0,0.8), 0 0 10px rgba(0,0,0,0.5);"><span class="material-symbols-outlined" style="font-size: 14px;">link</span>${link.replace(/^https?:\/\//, '')}</div>` : ''}
           </div>
@@ -769,12 +830,11 @@ function renderTags() {
     el.textContent = tag;
     el.style.backgroundColor = isSelected ? 'var(--tertiary)' : 'var(--surface-container)';
     el.style.color = isSelected ? 'var(--on-tertiary)' : 'var(--on-surface)';
-    el.style.border = isSelected ? '1px solid var(--tertiary)' : '1px solid var(--tertiary-fixed-dim)';
+    el.style.border = isSelected ? '1px solid var(--tertiary)' : '1px solid transparent';
     el.style.borderRadius = 'var(--rounded-full)';
     el.style.padding = '8px 16px';
     el.style.cursor = 'pointer';
     el.style.transition = 'all 0.2s';
-    el.style.boxShadow = isSelected ? '0 10px 20px rgba(0,0,0,0.05)' : 'none';
     el.onclick = () => {
       if (isSelected) addTags = addTags.filter(t => t !== tag);
       else addTags.push(tag);
@@ -817,15 +877,15 @@ function renderTags() {
     btn.style.alignItems = 'center';
     btn.style.gap = 'var(--spacing-unit)';
     btn.style.backgroundColor = 'var(--surface-container-low)';
-    btn.style.border = '1px dashed var(--outline-variant)';
+    btn.style.border = '1px solid transparent';
     btn.style.color = 'var(--on-surface-variant)';
     btn.style.borderRadius = 'var(--rounded-full)';
     btn.style.padding = '8px 16px';
     btn.style.transition = 'all 0.2s';
     btn.style.cursor = 'pointer';
     btn.innerHTML = `<span class="material-symbols-outlined" style="font-size: 16px;">add</span> Add Tag`;
-    btn.onmouseover = () => { btn.style.borderColor = 'var(--outline)'; btn.style.color = 'var(--on-surface)'; };
-    btn.onmouseout = () => { btn.style.borderColor = 'var(--outline-variant)'; btn.style.color = 'var(--on-surface-variant)'; };
+    btn.onmouseover = () => { btn.style.backgroundColor = 'var(--surface-container-highest)'; };
+    btn.onmouseout = () => { btn.style.backgroundColor = 'var(--surface-container-low)'; };
     btn.onclick = () => { isAddingTag = true; renderTags(); };
     tagsContainer.appendChild(btn);
   }
@@ -880,25 +940,36 @@ btnSaveEntry.addEventListener('click', async () => {
   try {
     if (pendingImageFile) finalImageUrl = await uploadImageToDrive(pendingImageFile);
 
-    entries.unshift({
-      id: Date.now().toString(),
-      title: addText.value,
-      url: addLink.value,
-      image: finalImageUrl,
-      aspectRatio: addImageAspectRatio,
-      tags: [...addTags],
-      type: addTags[0] || 'Note'
-    });
+    if (editingId) {
+      const index = entries.findIndex(e => e.id === editingId);
+      if (index !== -1) {
+        entries[index].title = addText.value;
+        entries[index].url = addLink.value;
+        entries[index].image = finalImageUrl;
+        entries[index].aspectRatio = addImageAspectRatio;
+        entries[index].tags = [...addTags];
+        entries[index].type = addTags[0] || 'Note';
+      }
+      showToast('Entry updated!');
+    } else {
+      entries.unshift({
+        id: Date.now().toString(),
+        title: addText.value,
+        url: addLink.value,
+        image: finalImageUrl,
+        aspectRatio: addImageAspectRatio,
+        tags: [...addTags],
+        type: addTags[0] || 'Note'
+      });
+      showToast('Entry saved!');
+    }
 
     await saveDataToDrive();
-    showToast('Entry saved successfully!');
 
-    addText.value = '';
-    addLink.value = '';
-    addImage.value = '';
-    addImageUrl = '';
-    pendingImageFile = null;
-    addTags = [];
+    // Reset Form
+    addText.value = ''; addLink.value = ''; addImage.value = ''; addImageUrl = ''; 
+    pendingImageFile = null; addTags = []; editingId = null;
+    btnSaveEntry.textContent = 'Save Entry';
     
     updateAvailableTags(); 
     renderAddPreview();
@@ -908,7 +979,7 @@ btnSaveEntry.addEventListener('click', async () => {
     handleRoute();
     renderFeed();
   } catch (err) {
-    showToast('Failed to save entry. Try again.');
+    showToast('Failed to save. Try again.');
   } finally {
     btnSaveEntry.textContent = originalText;
     btnSaveEntry.style.pointerEvents = 'auto';
@@ -919,8 +990,11 @@ renderAddPreview();
 renderTags();
 
 // --- Bind Global Events ---
+window.addEventListener('hashchange', handleRoute);
+
 let lastWindowWidth = window.innerWidth;
 let resizeTimer;
+
 window.addEventListener('resize', () => {
   clearTimeout(resizeTimer);
   resizeTimer = setTimeout(() => {
@@ -962,7 +1036,7 @@ btnDelete.addEventListener('click', async () => {
   await saveDataToDrive();
 
   authOverlay.style.display = 'none';
-  showToast(`${count} item(s) deleted.`);
+  showToast(`${count} item(s) deleted`);
   renderFeed();
   updateSelectionState();
 });
