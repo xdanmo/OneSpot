@@ -14,18 +14,22 @@
     <!-- COMBINED HOME & SEARCH VIEW -->
     <main class="feed-container" id="view-home">
       
-      <!-- Animated Search Wrapper -->
+      <!-- GPU-Accelerated Search Wrapper -->
       <div id="search-header" class="search-header-anim search-header-collapsed">
-        <div style="max-width: 600px; margin: 0 auto 16px; position: relative;">
-          <span class="material-symbols-outlined" style="position: absolute; left: 16px; top: 50%; transform: translateY(-50%); color: var(--outline-variant); pointer-events: none;">search</span>
-          <input type="text" id="search-input" placeholder="Search by title or link..." class="font-body-md shadow-ambient"
-            style="width: 100%; background-color: var(--surface-container-highest); border: 1px solid var(--tertiary-fixed-dim); border-radius: var(--rounded-full); padding: 14px 16px 14px 48px; color: var(--on-surface); outline: none; transition: all 0.2s;"
-            onfocus="this.style.borderColor='var(--primary)'; this.style.boxShadow='0 0 0 1px var(--primary)';"
-            onblur="this.style.borderColor='var(--tertiary-fixed-dim)'; this.style.boxShadow='none';" />
-        </div>
-        
-        <!-- Tags Container for Filtering -->
-        <div id="search-tags-container" style="max-width: 600px; margin: 0 auto; display: flex; flex-wrap: wrap; gap: 8px; justify-content: center;">
+        <div class="search-header-inner">
+          <div class="search-content">
+            <div style="max-width: 600px; margin: 0 auto 16px; position: relative;">
+              <span class="material-symbols-outlined" style="position: absolute; left: 16px; top: 50%; transform: translateY(-50%); color: var(--outline-variant); pointer-events: none;">search</span>
+              <input type="text" id="search-input" placeholder="Search by title or link..." class="font-body-md shadow-ambient"
+                style="width: 100%; background-color: var(--surface-container-highest); border: 1px solid var(--tertiary-fixed-dim); border-radius: var(--rounded-full); padding: 14px 16px 14px 48px; color: var(--on-surface); outline: none; transition: all 0.2s;"
+                onfocus="this.style.borderColor='var(--primary)'; this.style.boxShadow='0 0 0 1px var(--primary)';"
+                onblur="this.style.borderColor='var(--tertiary-fixed-dim)'; this.style.boxShadow='none';" />
+            </div>
+            
+            <!-- Tags Container for Filtering -->
+            <div id="search-tags-container" style="max-width: 600px; margin: 0 auto; display: flex; flex-wrap: wrap; gap: 8px; justify-content: center;">
+            </div>
+          </div>
         </div>
       </div>
 
