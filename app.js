@@ -14,6 +14,7 @@ let isInitialRender = true;
 let lastSelectionTime = 0;
 let searchQuery = ''; 
 let selectedSearchTag = null; 
+let currentRouteHash = window.location.hash.replace('#', '') || '/'; // Track history for animation
 
 // DOM Elements
 const authOverlay = document.getElementById('auth-overlay');
@@ -264,32 +265,65 @@ async function uploadImageToDrive(file) {
 }
 
 
-// --- Routing & UI Snap Animations ---
-function handleRoute(noAnimate = false) {
+// --- Routing & UI Orchestrated Animations ---
+async function handleRoute(noAnimate = false) {
   if (typeof noAnimate !== 'boolean') noAnimate = false;
   
   const hash = window.location.hash.replace('#', '') || '/';
+  const oldHash = currentRouteHash;
+  currentRouteHash = hash;
+
+  const searchHeader = document.getElementById('search-header');
+
+  // 1. REVERSE ANIMATION: If leaving Search for Home
+  if (oldHash === '/search' && hash === '/') {
+    if (searchHeader) {
+      searchHeader.classList.remove('search-header-expanded');
+      searchHeader.classList.add('search-header-collapsed');
+      // Wait for the collapse animation to physically pull the grid back up
+      await new Promise(r => setTimeout(r, 350)); 
+    }
+  }
   
+  // 2. Hide all views
   Object.values(views).forEach(v => {
     if (v) {
       v.style.display = 'none';
-      v.style.animation = 'none'; // Clear existing animations
+      v.style.animation = 'none'; // Clear any residual fade-in animations
     }
   });
   
+  // 3. Show target view
   const activeView = views[hash] || views['/'];
   if (activeView) {
     activeView.style.display = 'block';
     
-    // NEW: Smooth trigger reflow and apply fade animation
-    void activeView.offsetWidth; 
-    if (!noAnimate) {
+    // Apply normal fade for everything EXCEPT the Home <-> Search transitions (we handle that with the grid slide)
+    if (!noAnimate && !(oldHash === '/' && hash === '/search') && !(oldHash === '/search' && hash === '/')) {
+      void activeView.offsetWidth; 
       activeView.style.animation = 'fade-in-up 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) forwards';
+    }
+  }
+
+  // 4. FORWARD ANIMATION: If entering Search from Home
+  if (hash === '/search') {
+    if (searchHeader) {
+      if (oldHash === '/') {
+        // Snap closed instantly, then spring open to push the grid down
+        searchHeader.classList.remove('search-header-expanded');
+        searchHeader.classList.add('search-header-collapsed');
+        void searchHeader.offsetWidth; // Force DOM refresh
+        searchHeader.classList.remove('search-header-collapsed');
+        searchHeader.classList.add('search-header-expanded');
+      } else {
+        // Entering from somewhere else, just expand normally
+        searchHeader.classList.remove('search-header-collapsed');
+        searchHeader.classList.add('search-header-expanded');
+      }
     }
   }
   
   updateNavIndicator(hash, noAnimate);
-  
   setTimeout(setMasonrySpans, 50);
 }
 
@@ -359,7 +393,7 @@ function scheduleMasonryUpdate() {
   masonryTimeout = setTimeout(setMasonrySpans, 100);
 }
 
-// NEW: Extract unique tags from all user entries (Removes need for default hardcoded tags)
+// Extract unique tags natively from all user entries
 let availableTags = [];
 function updateAvailableTags() {
   const tags = new Set();
@@ -520,18 +554,18 @@ function createCardElement(item) {
 
 function renderFeed() {
   feedGrid.innerHTML = '';
-  searchFeedGrid.innerHTML = ''; // NEW: Populate search grid once on load
+  searchFeedGrid.innerHTML = '';
   
   updateAvailableTags();
 
   entries.forEach(item => {
     feedGrid.appendChild(createCardElement(item));
-    searchFeedGrid.appendChild(createCardElement(item)); // Add identical DOM nodes to search feed
+    searchFeedGrid.appendChild(createCardElement(item));
   });
 
   renderTags(); 
   renderSearchTags(); 
-  renderSearchFeed(); // Applies default hidden/visible logic instantly
+  renderSearchFeed();
 
   applySelectionStyles();
 
@@ -546,12 +580,12 @@ function renderFeed() {
   });
 }
 
-// NEW: High-performance DOM toggling (prevents image reload/blinking)
 function renderSearchFeed() {
   const query = searchQuery.toLowerCase();
   const items = searchFeedGrid.querySelectorAll('.masonry-item');
   let visibleCount = 0;
 
+  // Toggle display cleanly without rebuilding DOM to stop blinking!
   items.forEach(itemDiv => {
     const article = itemDiv.querySelector('article');
     if (!article) return;
@@ -573,14 +607,13 @@ function renderSearchFeed() {
     }
     
     if (matchesQuery && matchesTag) {
-      itemDiv.style.display = 'block'; // Show matched item without rebuilding DOM
+      itemDiv.style.display = 'block';
       visibleCount++;
     } else {
-      itemDiv.style.display = 'none'; // Hide unmatched item
+      itemDiv.style.display = 'none';
     }
   });
 
-  // Handle "no results" state cleanly
   let noResultsMsg = searchFeedGrid.querySelector('.no-results-msg');
   if (visibleCount === 0) {
     if (!noResultsMsg) {
@@ -747,7 +780,6 @@ let isAddingTag = false;
 function renderTags() {
   tagsContainer.innerHTML = '';
   
-  // Combine all known tags with any new tags currently being built in this session
   const combinedTags = Array.from(new Set([...availableTags, ...addTags]));
 
   combinedTags.forEach(tag => {
@@ -896,7 +928,7 @@ btnSaveEntry.addEventListener('click', async () => {
     pendingImageFile = null;
     addTags = [];
     
-    updateAvailableTags(); // Save new tags instantly into the ecosystem
+    updateAvailableTags(); 
     renderAddPreview();
     renderTags();
 
