@@ -11,15 +11,10 @@
 <body>
   <div class="app-container">
     
-    <!-- HOME VIEW -->
+    <!-- COMBINED HOME & SEARCH VIEW -->
     <main class="feed-container" id="view-home">
-      <div class="masonry-grid" id="feed-grid"></div>
-    </main>
-
-    <!-- SEARCH VIEW -->
-    <main class="feed-container" id="view-search" style="display: none;">
       
-      <!-- NEW: Animated Wrapper -->
+      <!-- Animated Search Wrapper -->
       <div id="search-header" class="search-header-anim search-header-collapsed">
         <div style="max-width: 600px; margin: 0 auto 16px; position: relative;">
           <span class="material-symbols-outlined" style="position: absolute; left: 16px; top: 50%; transform: translateY(-50%); color: var(--outline-variant); pointer-events: none;">search</span>
@@ -29,12 +24,13 @@
             onblur="this.style.borderColor='var(--tertiary-fixed-dim)'; this.style.boxShadow='none';" />
         </div>
         
+        <!-- Tags Container for Filtering -->
         <div id="search-tags-container" style="max-width: 600px; margin: 0 auto; display: flex; flex-wrap: wrap; gap: 8px; justify-content: center;">
         </div>
       </div>
 
-      <!-- Search Results Grid -->
-      <div class="masonry-grid" id="search-feed-grid"></div>
+      <!-- Unified Results Grid -->
+      <div class="masonry-grid" id="feed-grid"></div>
     </main>
 
     <main class="container" id="view-profile"
