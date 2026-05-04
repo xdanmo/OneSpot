@@ -118,6 +118,12 @@ window.onload = function () {
 
   setTimeout(() => handleRoute(true), 150);
   setTimeout(() => handleRoute(true), 500); 
+
+  // FIX 1: Robust ResizeObserver guarantees the grid never stacks on hard refresh
+  if (feedGrid) {
+    const gridObserver = new ResizeObserver(() => scheduleMasonryUpdate());
+    gridObserver.observe(feedGrid);
+  }
 };
 
 async function initGoogleDriveClient() {
@@ -311,6 +317,8 @@ function handleRoute(noAnimate = false) {
         searchHeader.classList.remove('search-header-collapsed');
         searchHeader.classList.add('search-header-expanded');
       }
+      // FIX 2: Explicitly render search tags while expanding so browser paints them correctly
+      renderSearchTags();
     }
   } else {
     if (activeView) {
@@ -544,8 +552,11 @@ function renderFeed() {
   renderSearchFeed();
   applySelectionStyles();
 
+  // FIX 1: Robust timeout chain ensures height triggers even on delayed layouts
   requestAnimationFrame(() => {
     setMasonrySpans();
+    setTimeout(setMasonrySpans, 150);
+    setTimeout(setMasonrySpans, 500);
     document.querySelectorAll('img').forEach(img => {
       if (!img.complete) {
         img.addEventListener('load', scheduleMasonryUpdate, { once: true });
@@ -731,7 +742,6 @@ function startEditMode(id) {
   pendingImageFile = null;
   addImage.value = ''; 
 
-  // FIX: Preload the image instantly for the edit preview
   if (entry.image) {
     const existingCard = document.querySelector(`article[data-id="${id}"] img`);
     addImageUrl = existingCard ? existingCard.src : entry.image;
@@ -752,7 +762,6 @@ function startEditMode(id) {
   renderTags();
 }
 
-// FIX: Event listeners for Edit buttons
 btnEdit.addEventListener('click', () => {
   if (selectedIds.length === 1) startEditMode(selectedIds[0]);
 });
@@ -786,10 +795,25 @@ function renderAddPreview() {
       </article>
     `;
   } else {
+    let previewSrc = addImageUrl;
+    let driveId = '';
+    const ucMatch = addImageUrl.match(/[?&]id=([^&]+)/);
+    const lh3Match = addImageUrl.match(/lh3\.googleusercontent\.com\/d\/([^/?]+)/);
+    
+    if (ucMatch) { 
+      driveId = ucMatch[1]; 
+      previewSrc = `https://googleusercontent.com/profile/picture/0${driveId}`; 
+    } else if (lh3Match) { 
+      driveId = lh3Match[1]; 
+    } else if (addImageUrl.includes('googleusercontent')) { 
+      const parts = addImageUrl.split('/0');
+      if (parts.length > 1) driveId = parts[1];
+    }
+
     html = `
       <article style="position: relative; background-color: transparent; border-radius: var(--rounded-xl); border: none;">
         <div class="shadow-ambient" style="position: relative; width: 100%; padding-bottom: ${addImageAspectRatio}; background-color: var(--surface-container-low); overflow: hidden; border-radius: var(--rounded-xl);">
-          <img src="${addImageUrl}" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; border-radius: var(--rounded-xl);" onerror="window.handleImageError(this)" />
+          <img src="${previewSrc}" data-drive-id="${driveId || ''}" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; border-radius: var(--rounded-xl);" onerror="window.handleImageError(this)" />
           <div style="position: absolute; bottom: 0; left: 0; width: 100%; padding: 32px 12px 12px; display: flex; flex-direction: column; gap: 6px; z-index: 2;">
             ${link ? `<div class="font-body-md" style="display: flex; align-items: center; gap: 4px; color: rgba(255,255,255,0.95); font-size: 12px; text-shadow: 0 1px 4px rgba(0,0,0,0.8), 0 0 10px rgba(0,0,0,0.5);"><span class="material-symbols-outlined" style="font-size: 14px;">link</span>${link.replace(/^https?:\/\//, '')}</div>` : ''}
           </div>
@@ -931,13 +955,9 @@ btnSaveEntry.addEventListener('click', async () => {
       if (index !== -1) {
         entries[index].title = addText.value;
         entries[index].url = addLink.value;
-        
-        // Only update image property if a true Google Drive ID/URL was generated or provided.
-        // We do NOT want to save local blob URLs to Google Drive.
         if (finalImageUrl && !finalImageUrl.startsWith('blob:')) {
           entries[index].image = finalImageUrl;
         }
-        
         entries[index].aspectRatio = addImageAspectRatio;
         entries[index].tags = [...addTags];
         entries[index].type = addTags[0] || 'Note';
