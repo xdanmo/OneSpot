@@ -299,9 +299,7 @@ function handleRoute(noAnimate = false) {
         searchHeader.classList.remove('search-header-collapsed');
         searchHeader.classList.add('search-header-expanded');
       }
-      if (!noAnimate && searchInput) {
-        setTimeout(() => searchInput.focus(), 300);
-      }
+      // REMOVED: Auto-focus search input to prevent keyboard from popping up on mobile
     }
   } else {
     if (homeView) homeView.style.display = 'none';
