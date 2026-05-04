@@ -132,8 +132,6 @@ function maybeEnableButtons() {
     if (saved) {
       try {
         const tokenInfo = JSON.parse(saved);
-        
-        // FIX: If token is expired, clear it and force physical button click to prevent popup block
         if (Date.now() > tokenInfo.expires_at) {
            console.log("Token expired, requiring manual re-auth.");
            localStorage.removeItem('onespot_token');
@@ -141,7 +139,6 @@ function maybeEnableButtons() {
            btnLogin.style.display = 'block';
            return;
         }
-        
         gapi.client.setToken(tokenInfo);
         initializeDrive();
         return;
@@ -155,7 +152,6 @@ function maybeEnableButtons() {
 }
 
 btnLogin.onclick = () => {
-  // FIX: This physical click event guarantees the popup won't be blocked
   tokenClient.requestAccessToken({ prompt: 'consent' });
 };
 
@@ -223,7 +219,6 @@ async function initializeDrive() {
   } catch (err) {
     console.error('Drive API Error:', err);
     if (err.status === 401 || (err.result && err.result.error && err.result.error.code === 401)) {
-      // FIX: Force manual logout on 401 to prevent popup blocks
       localStorage.removeItem('onespot_token');
       authStatus.style.display = 'none';
       btnLogin.style.display = 'block';
@@ -731,12 +726,18 @@ function startEditMode(id) {
   editingId = id;
   addText.value = entry.title || '';
   addLink.value = entry.url || '';
-  addImageUrl = entry.image || '';
   addImageAspectRatio = entry.aspectRatio || '100%';
   addTags = entry.tags ? [...entry.tags] : [];
-  
   pendingImageFile = null;
   addImage.value = ''; 
+
+  // FIX: Preload the image instantly for the edit preview
+  if (entry.image) {
+    const existingCard = document.querySelector(`article[data-id="${id}"] img`);
+    addImageUrl = existingCard ? existingCard.src : entry.image;
+  } else {
+    addImageUrl = '';
+  }
 
   btnSaveEntry.textContent = 'Update Entry';
   
@@ -751,6 +752,7 @@ function startEditMode(id) {
   renderTags();
 }
 
+// FIX: Event listeners for Edit buttons
 btnEdit.addEventListener('click', () => {
   if (selectedIds.length === 1) startEditMode(selectedIds[0]);
 });
@@ -761,11 +763,6 @@ btnSheetEdit.addEventListener('click', () => {
 
 
 // --- Add Entry Logic ---
-let addTags = [];
-let addImageUrl = '';
-let addImageAspectRatio = '100%';
-let pendingImageFile = null;
-
 const addText = document.getElementById('add-text');
 const addLink = document.getElementById('add-link');
 const addImage = document.getElementById('add-image');
@@ -789,25 +786,10 @@ function renderAddPreview() {
       </article>
     `;
   } else {
-    let previewSrc = addImageUrl;
-    let driveId = '';
-    const ucMatch = addImageUrl.match(/[?&]id=([^&]+)/);
-    const lh3Match = addImageUrl.match(/lh3\.googleusercontent\.com\/d\/([^/?]+)/);
-    
-    if (ucMatch) { 
-      driveId = ucMatch[1]; 
-      previewSrc = `https://googleusercontent.com/profile/picture/0${driveId}`; 
-    } else if (lh3Match) { 
-      driveId = lh3Match[1]; 
-    } else if (addImageUrl.includes('googleusercontent')) { 
-      const parts = addImageUrl.split('/0');
-      if (parts.length > 1) driveId = parts[1];
-    }
-
     html = `
       <article style="position: relative; background-color: transparent; border-radius: var(--rounded-xl); border: none;">
         <div class="shadow-ambient" style="position: relative; width: 100%; padding-bottom: ${addImageAspectRatio}; background-color: var(--surface-container-low); overflow: hidden; border-radius: var(--rounded-xl);">
-          <img src="${previewSrc}" data-drive-id="${driveId || ''}" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; border-radius: var(--rounded-xl);" onerror="window.handleImageError(this)" />
+          <img src="${addImageUrl}" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; border-radius: var(--rounded-xl);" onerror="window.handleImageError(this)" />
           <div style="position: absolute; bottom: 0; left: 0; width: 100%; padding: 32px 12px 12px; display: flex; flex-direction: column; gap: 6px; z-index: 2;">
             ${link ? `<div class="font-body-md" style="display: flex; align-items: center; gap: 4px; color: rgba(255,255,255,0.95); font-size: 12px; text-shadow: 0 1px 4px rgba(0,0,0,0.8), 0 0 10px rgba(0,0,0,0.5);"><span class="material-symbols-outlined" style="font-size: 14px;">link</span>${link.replace(/^https?:\/\//, '')}</div>` : ''}
           </div>
@@ -949,7 +931,13 @@ btnSaveEntry.addEventListener('click', async () => {
       if (index !== -1) {
         entries[index].title = addText.value;
         entries[index].url = addLink.value;
-        entries[index].image = finalImageUrl;
+        
+        // Only update image property if a true Google Drive ID/URL was generated or provided.
+        // We do NOT want to save local blob URLs to Google Drive.
+        if (finalImageUrl && !finalImageUrl.startsWith('blob:')) {
+          entries[index].image = finalImageUrl;
+        }
+        
         entries[index].aspectRatio = addImageAspectRatio;
         entries[index].tags = [...addTags];
         entries[index].type = addTags[0] || 'Note';
@@ -993,8 +981,6 @@ renderAddPreview();
 renderTags();
 
 // --- Bind Global Events ---
-let lastWindowWidth = window.innerWidth;
-let resizeTimer;
 window.addEventListener('resize', () => {
   clearTimeout(resizeTimer);
   resizeTimer = setTimeout(() => {
