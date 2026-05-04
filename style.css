@@ -142,10 +142,17 @@ input {
   scrollbar-width: none;
 }
 
+/* Horizontal scroll hiding specifically for the tags */
+.hide-scroll {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.hide-scroll::-webkit-scrollbar {
+  display: none;
+}
+
 .shadow-ambient { box-shadow: 0 20px 40px rgba(95, 94, 91, 0.05); }
 .shadow-lg { box-shadow: 0 20px 50px rgba(0, 0, 0, 0.1); }
-
-/* Changed: Removed the shadow from the bottom nav */
 .shadow-nav { box-shadow: none; }
 
 .backdrop-blur {
@@ -178,7 +185,6 @@ input {
   }
 }
 
-/* Masonry Grid — row-first fill with JS row-span sizing (no gaps) */
 .masonry-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
@@ -190,8 +196,10 @@ input {
 .masonry-item {
   display: block;
   width: 100%;
-  overflow: hidden;
+  /* REMOVED: overflow: hidden; -> This caused the hover clipping! */
   margin-bottom: 12px;
+  position: relative;
+  z-index: 1; /* Establishes baseline stacking context */
 }
 
 @media (min-width: 600px) {
@@ -214,7 +222,7 @@ input {
 .card-hover ::selection { background: transparent !important; color: inherit !important; }
 .card-hover ::-moz-selection { background: transparent !important; color: inherit !important; }
 .card-hover img { -webkit-user-drag: none !important; pointer-events: none; }
-.card-hover:hover { transform: translateY(-4px) !important; }
+.card-hover:hover { transform: translateY(-4px) !important; z-index: 10; }
 .img-hover { transition: transform 0.7s ease-out !important; }
 .card-hover:hover .img-hover { transform: scale(1.05) !important; }
 
@@ -230,37 +238,24 @@ input {
   100% { opacity: 1; transform: translateY(0); }
 }
 
-/* NEW: GPU-Accelerated CSS Grid Search Animation (Zero Lag) */
+/* GPU-Accelerated CSS Grid Search Animation */
 .search-header-anim {
   display: grid;
   transition: grid-template-rows 0.35s cubic-bezier(0.2, 0.8, 0.2, 1);
   will-change: grid-template-rows;
 }
-
-.search-header-collapsed {
-  grid-template-rows: 0fr;
-  pointer-events: none;
-}
-
-.search-header-expanded {
-  grid-template-rows: 1fr;
-  pointer-events: auto;
-}
-
+.search-header-collapsed { grid-template-rows: 0fr; pointer-events: none; }
+.search-header-expanded { grid-template-rows: 1fr; pointer-events: auto; }
 .search-header-inner {
-  min-height: 0; /* Required for grid animation */
+  min-height: 0; 
   overflow: hidden;
   opacity: 0;
   transform: translateY(-15px) scale(0.97);
   transition: opacity 0.25s ease, transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1);
   will-change: transform, opacity;
 }
-
 .search-header-expanded .search-header-inner {
   opacity: 1;
   transform: translateY(0) scale(1);
 }
-
-.search-content {
-  padding-bottom: 24px;
-}
+.search-content { padding-bottom: 24px; }
