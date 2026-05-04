@@ -12,6 +12,7 @@ let entries = [];
 let selectedIds = [];
 let isInitialRender = true;
 let lastSelectionTime = 0;
+let searchQuery = ''; // NEW: Search state tracking
 
 // DOM Elements
 const authOverlay = document.getElementById('auth-overlay');
@@ -35,6 +36,30 @@ const detailSheet = document.getElementById('detail-sheet');
 const detailBackdrop = document.getElementById('detail-backdrop');
 const detailContent = document.getElementById('detail-content');
 const btnSheetClose = document.getElementById('btn-sheet-close');
+const searchInput = document.getElementById('search-input'); // NEW: Search Input
+
+// --- Global Toast Notification ---
+function showToast(message) {
+  const container = document.getElementById('toast-container');
+  const toast = document.createElement('div');
+  toast.className = 'font-label-sm shadow-lg';
+  toast.style.cssText = 'background-color: var(--inverse-surface); color: var(--inverse-on-surface); padding: 12px 24px; border-radius: var(--rounded-full); opacity: 0; transform: translateY(20px); transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);';
+  toast.textContent = message;
+  container.appendChild(toast);
+  
+  // Trigger animation
+  requestAnimationFrame(() => {
+    toast.style.opacity = '1';
+    toast.style.transform = 'translateY(0)';
+  });
+
+  // Remove after 3 seconds
+  setTimeout(() => {
+    toast.style.opacity = '0';
+    toast.style.transform = 'translateY(20px)';
+    setTimeout(() => toast.remove(), 300);
+  }, 3000);
+}
 
 // --- Global Error Handler for Images ---
 window.handleImageError = async function(img) {
@@ -191,7 +216,7 @@ async function initializeDrive() {
       authOverlay.style.display = 'flex';
       return;
     } else {
-      alert('Failed to connect to Drive. Check console.');
+      showToast('Failed to connect to Drive. Please try again.'); // NEW: Toast replacing alert
     }
   }
 
@@ -265,7 +290,6 @@ function updateNavIndicator(hash, noAnimate = false) {
 
   const activeLink = navLinks[activeIndex];
   if (activeLink && navIndicator) {
-    // Kill transition instantly if requested
     if (noAnimate) {
       navIndicator.style.transition = 'none';
     }
@@ -276,7 +300,6 @@ function updateNavIndicator(hash, noAnimate = false) {
     navIndicator.style.height = activeLink.offsetHeight + 'px';
     navIndicator.style.opacity = '1';
 
-    // Force browser to redraw immediately, then turn transition back on for tab clicks
     if (noAnimate) {
       void navIndicator.offsetWidth; 
       navIndicator.style.transition = 'all 0.5s ease';
@@ -286,10 +309,10 @@ function updateNavIndicator(hash, noAnimate = false) {
 
 // --- Masonry Row Spanning ---
 function setMasonrySpans() {
-  const rowSize = 4; // MUST match grid-auto-rows in style.css
+  const rowSize = 4;
 
   document.querySelectorAll('.masonry-item').forEach(item => {
-    item.style.gridRowEnd = ''; // Reset to flow naturally
+    item.style.gridRowEnd = '';
     
     const article = item.children[0];
     if (!article) return;
@@ -309,9 +332,34 @@ function scheduleMasonryUpdate() {
   masonryTimeout = setTimeout(setMasonrySpans, 100);
 }
 
+// NEW: Search Input Event Listener
+if (searchInput) {
+  searchInput.addEventListener('input', (e) => {
+    searchQuery = e.target.value.toLowerCase().trim();
+    renderFeed();
+  });
+}
+
 function renderFeed() {
   feedGrid.innerHTML = '';
-  entries.forEach(item => {
+  
+  // NEW: Filter entries based on search query
+  const filteredEntries = entries.filter(item => {
+    if (!searchQuery) return true;
+    
+    const titleMatch = item.title && item.title.toLowerCase().includes(searchQuery);
+    const urlMatch = item.url && item.url.toLowerCase().includes(searchQuery);
+    const tagMatch = item.tags && item.tags.some(tag => tag.toLowerCase().includes(searchQuery));
+    
+    return titleMatch || urlMatch || tagMatch;
+  });
+
+  if (filteredEntries.length === 0 && searchQuery) {
+    feedGrid.innerHTML = `<p style="grid-column: 1 / -1; text-align: center; color: var(--outline); margin-top: 40px;" class="font-body-md">No entries found for "${searchQuery}"</p>`;
+    return;
+  }
+
+  filteredEntries.forEach(item => {
     const itemDiv = document.createElement('div');
     itemDiv.className = 'masonry-item';
 
@@ -349,9 +397,7 @@ function renderFeed() {
         </div>`;
     } else {
       article.style.backgroundColor = 'transparent';
-      
       const safeRatio = (item.aspectRatio && item.aspectRatio !== 'NaN%') ? item.aspectRatio : '100%';
-      
       article.innerHTML = `
         <div class="shadow-ambient" style="position:relative;width:100%;padding-bottom:${safeRatio};background-color:var(--surface-container-low);overflow:hidden;border-radius:var(--rounded-xl);transform:translateZ(0);-webkit-mask-image:-webkit-radial-gradient(white,black);">
           <img src="${imgSource}" data-drive-id="${driveId || ''}" alt="" class="img-hover" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover; pointer-events:none;"
@@ -365,7 +411,6 @@ function renderFeed() {
         </div>`;
     }
 
-    // --- BULLETPROOF INTERACTION EVENTS ---
     let pressTimer = null;
     let startY = 0;
     let startX = 0;
@@ -464,28 +509,22 @@ function applySelectionStyles() {
 function updateSelectionState() {
   applySelectionStyles();
   
-  // Make bottom nav fade smoothly instead of display:none
   bottomNav.style.transition = 'opacity 0.2s ease';
 
   if (selectedIds.length > 0) {
-    // Hide Bottom Nav gracefully
     bottomNav.style.opacity = '0';
     bottomNav.style.pointerEvents = 'none';
     
-    // Show Selection Bar
     selectionBar.style.display = 'flex';
     selectionCount.textContent = `${selectedIds.length} Selected`;
     const btnEdit = document.getElementById('btn-edit');
     if (btnEdit) btnEdit.style.display = selectedIds.length === 1 ? 'block' : 'none';
   } else {
-    // Show Bottom Nav gracefully
     bottomNav.style.opacity = '1';
     bottomNav.style.pointerEvents = 'auto';
     
-    // Hide Selection Bar
     selectionBar.style.display = 'none';
     
-    // Snaps the indicator instantly because layout geometry was NEVER lost!
     updateNavIndicator(window.location.hash.replace('#', '') || '/', true);
   }
 }
@@ -708,35 +747,50 @@ addImageFile.addEventListener('change', (e) => {
 btnSaveEntry.addEventListener('click', async () => {
   if (!addText.value.trim()) return;
 
+  // Change text on save button to show loading
+  const originalText = btnSaveEntry.textContent;
+  btnSaveEntry.textContent = 'Saving...';
+  btnSaveEntry.style.pointerEvents = 'none';
+
   let finalImageUrl = addImageUrl;
 
-  if (pendingImageFile) {
-    finalImageUrl = await uploadImageToDrive(pendingImageFile);
+  try {
+    if (pendingImageFile) {
+      finalImageUrl = await uploadImageToDrive(pendingImageFile);
+    }
+
+    entries.unshift({
+      id: Date.now().toString(),
+      title: addText.value,
+      url: addLink.value,
+      image: finalImageUrl,
+      aspectRatio: addImageAspectRatio,
+      tags: [...addTags],
+      type: addTags[0] || 'Note'
+    });
+
+    await saveDataToDrive();
+    
+    // NEW: Trigger toast
+    showToast('Entry saved successfully!');
+
+    addText.value = '';
+    addLink.value = '';
+    addImage.value = '';
+    addImageUrl = '';
+    pendingImageFile = null;
+    addTags = [];
+    renderAddPreview();
+    renderTags();
+
+    window.location.hash = '#/';
+    renderFeed();
+  } catch (err) {
+    showToast('Failed to save entry. Try again.');
+  } finally {
+    btnSaveEntry.textContent = originalText;
+    btnSaveEntry.style.pointerEvents = 'auto';
   }
-
-  entries.unshift({
-    id: Date.now().toString(),
-    title: addText.value,
-    url: addLink.value,
-    image: finalImageUrl,
-    aspectRatio: addImageAspectRatio,
-    tags: [...addTags],
-    type: addTags[0] || 'Note'
-  });
-
-  await saveDataToDrive();
-
-  addText.value = '';
-  addLink.value = '';
-  addImage.value = '';
-  addImageUrl = '';
-  pendingImageFile = null;
-  addTags = [];
-  renderAddPreview();
-  renderTags();
-
-  window.location.hash = '#/';
-  renderFeed();
 });
 
 renderAddPreview();
@@ -751,7 +805,7 @@ let resizeTimer;
 window.addEventListener('resize', () => {
   clearTimeout(resizeTimer);
   resizeTimer = setTimeout(() => {
-    updateNavIndicator(window.location.hash.replace('#', '') || '/', true); // Instant snap on resize
+    updateNavIndicator(window.location.hash.replace('#', '') || '/', true); 
     if (window.innerWidth !== lastWindowWidth) {
       lastWindowWidth = window.innerWidth;
       setMasonrySpans();
@@ -785,12 +839,14 @@ btnDelete.addEventListener('click', async () => {
     }
   }
 
+  const count = selectedIds.length;
   entries = entries.filter(e => !selectedIds.includes(e.id));
   selectedIds = [];
 
   await saveDataToDrive();
 
   authOverlay.style.display = 'none';
+  showToast(`${count} item(s) deleted.`); // NEW: Toast notification
   renderFeed();
   updateSelectionState();
 });
@@ -809,4 +865,4 @@ document.getElementById('btn-logout').addEventListener('click', () => {
   window.location.reload();
 });
 
-handleRoute(true); // Call instantly without animation on initial page load
+handleRoute(true);
