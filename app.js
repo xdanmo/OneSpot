@@ -15,8 +15,8 @@ let lastSelectionTime = 0;
 let searchQuery = ''; 
 let selectedSearchTag = null; 
 let isDetailSheetOpen = false;
-let editingId = null; // Track if we are editing an entry
-let currentDetailId = null; // Track which entry is open in detail sheet
+let editingId = null; 
+let currentDetailId = null; 
 
 // DOM Elements
 const authOverlay = document.getElementById('auth-overlay');
@@ -58,12 +58,12 @@ function showToast(message) {
   navToast.textContent = message;
   navToast.style.opacity = '1';
   if (navIndicator) navIndicator.style.opacity = '0';
-  navLinks.forEach(l => l.style.opacity = '0'); // Fade out icons
+  navLinks.forEach(l => l.style.opacity = '0'); 
   
   setTimeout(() => {
     navToast.style.opacity = '0';
     if (navIndicator) navIndicator.style.opacity = '1';
-    navLinks.forEach(l => l.style.opacity = '1'); // Fade back icons
+    navLinks.forEach(l => l.style.opacity = '1'); 
   }, 3000);
 }
 
@@ -132,10 +132,16 @@ function maybeEnableButtons() {
     if (saved) {
       try {
         const tokenInfo = JSON.parse(saved);
+        
+        // FIX: If token is expired, clear it and force physical button click to prevent popup block
         if (Date.now() > tokenInfo.expires_at) {
-           tokenClient.requestAccessToken({ prompt: '' }); 
+           console.log("Token expired, requiring manual re-auth.");
+           localStorage.removeItem('onespot_token');
+           authStatus.style.display = 'none';
+           btnLogin.style.display = 'block';
            return;
         }
+        
         gapi.client.setToken(tokenInfo);
         initializeDrive();
         return;
@@ -149,6 +155,7 @@ function maybeEnableButtons() {
 }
 
 btnLogin.onclick = () => {
+  // FIX: This physical click event guarantees the popup won't be blocked
   tokenClient.requestAccessToken({ prompt: 'consent' });
 };
 
@@ -216,7 +223,10 @@ async function initializeDrive() {
   } catch (err) {
     console.error('Drive API Error:', err);
     if (err.status === 401 || (err.result && err.result.error && err.result.error.code === 401)) {
-      tokenClient.requestAccessToken({ prompt: '' });
+      // FIX: Force manual logout on 401 to prevent popup blocks
+      localStorage.removeItem('onespot_token');
+      authStatus.style.display = 'none';
+      btnLogin.style.display = 'block';
       return;
     } else {
       showToast('Failed to connect to Drive. Please try again.');
@@ -270,7 +280,6 @@ function handleRoute(noAnimate = false) {
   const hash = window.location.hash.replace('#', '') || '/';
   const searchHeader = document.getElementById('search-header');
 
-  // Cancel edit mode if user navigates away from Add tab
   if (hash !== '/add' && editingId) {
     editingId = null;
     btnSaveEntry.textContent = 'Save Entry';
@@ -278,10 +287,8 @@ function handleRoute(noAnimate = false) {
     renderAddPreview(); renderTags();
   }
 
-  // FIX: Reset scroll position to top instantly to prevent layout glitch during view swap
   window.scrollTo({ top: 0, behavior: 'instant' });
 
-  // Strictly hide all views immediately
   Object.values(views).forEach(v => {
     if (v) {
       v.style.display = 'none';
@@ -627,22 +634,21 @@ function updateSelectionState() {
   applySelectionStyles();
 
   if (selectedIds.length > 0) {
-    bottomNav.style.transform = 'translateY(150%)'; // Slide out nav
+    bottomNav.style.transform = 'translateY(150%)'; 
     selectionBar.style.display = 'flex';
     
-    // Tiny delay so the slide feels physical
     setTimeout(() => {
-      selectionBar.style.transform = 'translateY(0)'; // Slide in selection bar
+      selectionBar.style.transform = 'translateY(0)'; 
     }, 50);
 
     selectionCount.textContent = `${selectedIds.length} Selected`;
     if (btnEdit) btnEdit.style.display = selectedIds.length === 1 ? 'block' : 'none';
   } else {
-    selectionBar.style.transform = 'translateY(150%)'; // Slide out selection bar
+    selectionBar.style.transform = 'translateY(150%)'; 
     
     setTimeout(() => {
       selectionBar.style.display = 'none';
-      bottomNav.style.transform = 'translateY(0)'; // Slide in nav
+      bottomNav.style.transform = 'translateY(0)'; 
       updateNavIndicator(window.location.hash.replace('#', '') || '/', true);
     }, 200);
   }
@@ -659,7 +665,7 @@ window.addEventListener('popstate', (e) => {
 
 function openDetailSheet(item, preloadedSrc = null) {
   isDetailSheetOpen = true;
-  currentDetailId = item.id; // Store ID for editing
+  currentDetailId = item.id; 
   history.pushState({ modal: true }, ''); 
 
   let imgHtml = '';
@@ -734,7 +740,6 @@ function startEditMode(id) {
 
   btnSaveEntry.textContent = 'Update Entry';
   
-  // Close any open sheets/bars
   if (isDetailSheetOpen) closeDetailSheet(false);
   if (selectedIds.length > 0) {
     selectedIds = [];
@@ -784,7 +789,6 @@ function renderAddPreview() {
       </article>
     `;
   } else {
-    // Determine preview image source carefully so it works with Drive permalinks during edit
     let previewSrc = addImageUrl;
     let driveId = '';
     const ucMatch = addImageUrl.match(/[?&]id=([^&]+)/);
@@ -966,7 +970,6 @@ btnSaveEntry.addEventListener('click', async () => {
 
     await saveDataToDrive();
 
-    // Reset Form
     addText.value = ''; addLink.value = ''; addImage.value = ''; addImageUrl = ''; 
     pendingImageFile = null; addTags = []; editingId = null;
     btnSaveEntry.textContent = 'Save Entry';
@@ -990,11 +993,8 @@ renderAddPreview();
 renderTags();
 
 // --- Bind Global Events ---
-window.addEventListener('hashchange', handleRoute);
-
 let lastWindowWidth = window.innerWidth;
 let resizeTimer;
-
 window.addEventListener('resize', () => {
   clearTimeout(resizeTimer);
   resizeTimer = setTimeout(() => {
