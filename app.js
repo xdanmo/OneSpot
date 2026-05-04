@@ -271,13 +271,21 @@ function handleRoute(noAnimate = false) {
   const hash = window.location.hash.replace('#', '') || '/';
   
   Object.values(views).forEach(v => {
-    if (v) v.style.display = 'none';
+    if (v) {
+      v.style.display = 'none';
+      v.style.animation = 'none'; // Clear existing animations
+    }
   });
   
-  if (views[hash]) {
-    views[hash].style.display = 'block';
-  } else if (views['/']) {
-    views['/'].style.display = 'block';
+  const activeView = views[hash] || views['/'];
+  if (activeView) {
+    activeView.style.display = 'block';
+    
+    // NEW: Smooth trigger reflow and apply fade animation
+    void activeView.offsetWidth; 
+    if (!noAnimate) {
+      activeView.style.animation = 'fade-in-up 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) forwards';
+    }
   }
   
   updateNavIndicator(hash, noAnimate);
@@ -351,21 +359,21 @@ function scheduleMasonryUpdate() {
   masonryTimeout = setTimeout(setMasonrySpans, 100);
 }
 
-function getUniqueTags() {
+// NEW: Extract unique tags from all user entries (Removes need for default hardcoded tags)
+let availableTags = [];
+function updateAvailableTags() {
   const tags = new Set();
   entries.forEach(e => {
     if (e.tags) e.tags.forEach(t => tags.add(t));
   });
-  return Array.from(tags).sort();
+  availableTags = Array.from(tags).sort();
 }
 
 function renderSearchTags() {
   if (!searchTagsContainer) return;
   searchTagsContainer.innerHTML = '';
   
-  const tags = getUniqueTags();
-  
-  tags.forEach(tag => {
+  availableTags.forEach(tag => {
     const btn = document.createElement('button');
     const isSelected = tag === selectedSearchTag;
     
@@ -512,12 +520,18 @@ function createCardElement(item) {
 
 function renderFeed() {
   feedGrid.innerHTML = '';
+  searchFeedGrid.innerHTML = ''; // NEW: Populate search grid once on load
+  
+  updateAvailableTags();
+
   entries.forEach(item => {
     feedGrid.appendChild(createCardElement(item));
+    searchFeedGrid.appendChild(createCardElement(item)); // Add identical DOM nodes to search feed
   });
 
-  renderSearchTags();
-  renderSearchFeed();
+  renderTags(); 
+  renderSearchTags(); 
+  renderSearchFeed(); // Applies default hidden/visible logic instantly
 
   applySelectionStyles();
 
@@ -532,34 +546,55 @@ function renderFeed() {
   });
 }
 
+// NEW: High-performance DOM toggling (prevents image reload/blinking)
 function renderSearchFeed() {
-  searchFeedGrid.innerHTML = '';
-  
-  const filteredEntries = entries.filter(item => {
+  const query = searchQuery.toLowerCase();
+  const items = searchFeedGrid.querySelectorAll('.masonry-item');
+  let visibleCount = 0;
+
+  items.forEach(itemDiv => {
+    const article = itemDiv.querySelector('article');
+    if (!article) return;
+    const id = article.dataset.id;
+    const entry = entries.find(e => e.id === id);
+    
+    if (!entry) return;
+
     let matchesQuery = true;
-    if (searchQuery) {
-      const titleMatch = item.title && item.title.toLowerCase().includes(searchQuery);
-      const urlMatch = item.url && item.url.toLowerCase().includes(searchQuery);
+    if (query) {
+      const titleMatch = entry.title && entry.title.toLowerCase().includes(query);
+      const urlMatch = entry.url && entry.url.toLowerCase().includes(query);
       matchesQuery = titleMatch || urlMatch;
     }
     
     let matchesTag = true;
     if (selectedSearchTag) {
-      matchesTag = item.tags && item.tags.includes(selectedSearchTag);
+      matchesTag = entry.tags && entry.tags.includes(selectedSearchTag);
     }
     
-    return matchesQuery && matchesTag;
+    if (matchesQuery && matchesTag) {
+      itemDiv.style.display = 'block'; // Show matched item without rebuilding DOM
+      visibleCount++;
+    } else {
+      itemDiv.style.display = 'none'; // Hide unmatched item
+    }
   });
 
-  if (filteredEntries.length === 0) {
-    searchFeedGrid.innerHTML = `<p style="grid-column: 1 / -1; text-align: center; color: var(--outline); margin-top: 40px;" class="font-body-md">No entries found.</p>`;
-    return;
+  // Handle "no results" state cleanly
+  let noResultsMsg = searchFeedGrid.querySelector('.no-results-msg');
+  if (visibleCount === 0) {
+    if (!noResultsMsg) {
+      noResultsMsg = document.createElement('p');
+      noResultsMsg.className = 'no-results-msg font-body-md';
+      noResultsMsg.style.cssText = 'grid-column: 1 / -1; text-align: center; color: var(--outline); margin-top: 40px;';
+      noResultsMsg.textContent = 'No entries found.';
+      searchFeedGrid.appendChild(noResultsMsg);
+    }
+    noResultsMsg.style.display = 'block';
+  } else if (noResultsMsg) {
+    noResultsMsg.style.display = 'none';
   }
 
-  filteredEntries.forEach(item => {
-    searchFeedGrid.appendChild(createCardElement(item));
-  });
-  
   applySelectionStyles();
   scheduleMasonryUpdate();
 }
@@ -662,7 +697,6 @@ function closeDetailSheet() {
 
 
 // --- Add Entry Logic ---
-const availableTags = ['Design', 'Interior', 'Art', 'Tech', 'Cooking', 'Travel', 'Minimalism', 'Architecture', 'Photography'];
 let addTags = [];
 let addImageUrl = '';
 let addImageAspectRatio = '100%';
@@ -712,7 +746,11 @@ let isAddingTag = false;
 
 function renderTags() {
   tagsContainer.innerHTML = '';
-  availableTags.forEach(tag => {
+  
+  // Combine all known tags with any new tags currently being built in this session
+  const combinedTags = Array.from(new Set([...availableTags, ...addTags]));
+
+  combinedTags.forEach(tag => {
     const isSelected = addTags.includes(tag);
     const el = document.createElement('div');
     el.className = 'font-label-sm';
@@ -748,10 +786,7 @@ function renderTags() {
 
     const saveTag = () => {
       const val = input.value.trim();
-      if (val && !availableTags.includes(val)) {
-        availableTags.push(val);
-        addTags.push(val);
-      } else if (val && availableTags.includes(val) && !addTags.includes(val)) {
+      if (val && !addTags.includes(val)) {
         addTags.push(val);
       }
       isAddingTag = false;
@@ -860,6 +895,8 @@ btnSaveEntry.addEventListener('click', async () => {
     addImageUrl = '';
     pendingImageFile = null;
     addTags = [];
+    
+    updateAvailableTags(); // Save new tags instantly into the ecosystem
     renderAddPreview();
     renderTags();
 
