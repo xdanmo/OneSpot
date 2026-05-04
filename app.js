@@ -14,20 +14,12 @@ let isInitialRender = true;
 let lastSelectionTime = 0;
 let searchQuery = ''; 
 let selectedSearchTag = null; 
-let currentRouteHash = window.location.hash.replace('#', '') || '/'; // Track history for animation
 
 // DOM Elements
 const authOverlay = document.getElementById('auth-overlay');
 const btnLogin = document.getElementById('btn-login');
 const authStatus = document.getElementById('auth-status');
-const views = {
-  '/': document.getElementById('view-home'),
-  '/search': document.getElementById('view-search'), 
-  '/add': document.getElementById('view-add'),
-  '/profile': document.getElementById('view-profile')
-};
 const feedGrid = document.getElementById('feed-grid');
-const searchFeedGrid = document.getElementById('search-feed-grid'); 
 const searchTagsContainer = document.getElementById('search-tags-container'); 
 const searchInput = document.getElementById('search-input'); 
 
@@ -266,63 +258,60 @@ async function uploadImageToDrive(file) {
 
 
 // --- Routing & UI Orchestrated Animations ---
-async function handleRoute(noAnimate = false) {
+function handleRoute(noAnimate = false) {
   if (typeof noAnimate !== 'boolean') noAnimate = false;
   
   const hash = window.location.hash.replace('#', '') || '/';
-  const oldHash = currentRouteHash;
-  currentRouteHash = hash;
-
+  
   const searchHeader = document.getElementById('search-header');
+  const homeView = document.getElementById('view-home');
+  const addView = document.getElementById('view-add');
+  const profileView = document.getElementById('view-profile');
 
-  // 1. REVERSE ANIMATION: If leaving Search for Home
-  if (oldHash === '/search' && hash === '/') {
-    if (searchHeader) {
-      searchHeader.classList.remove('search-header-expanded');
-      searchHeader.classList.add('search-header-collapsed');
-      // Wait for the collapse animation to physically pull the grid back up
-      await new Promise(r => setTimeout(r, 350)); 
-    }
-  }
-  
-  // 2. Hide all views
-  Object.values(views).forEach(v => {
-    if (v) {
-      v.style.display = 'none';
-      v.style.animation = 'none'; // Clear any residual fade-in animations
-    }
-  });
-  
-  // 3. Show target view
-  const activeView = views[hash] || views['/'];
-  if (activeView) {
-    activeView.style.display = 'block';
-    
-    // Apply normal fade for everything EXCEPT the Home <-> Search transitions (we handle that with the grid slide)
-    if (!noAnimate && !(oldHash === '/' && hash === '/search') && !(oldHash === '/search' && hash === '/')) {
-      void activeView.offsetWidth; 
-      activeView.style.animation = 'fade-in-up 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) forwards';
-    }
-  }
+  // Hide independent views by default
+  if (addView) addView.style.display = 'none';
+  if (profileView) profileView.style.display = 'none';
 
-  // 4. FORWARD ANIMATION: If entering Search from Home
-  if (hash === '/search') {
-    if (searchHeader) {
-      if (oldHash === '/') {
-        // Snap closed instantly, then spring open to push the grid down
+  if (hash === '/' || hash === '/search') {
+    if (homeView) {
+      homeView.style.display = 'block';
+      homeView.style.animation = 'none'; // Prevent fade-in flash on grid
+    }
+
+    if (hash === '/') {
+      // Home selected: Smoothly collapse search bar and reset filters
+      if (searchHeader) {
         searchHeader.classList.remove('search-header-expanded');
         searchHeader.classList.add('search-header-collapsed');
-        void searchHeader.offsetWidth; // Force DOM refresh
-        searchHeader.classList.remove('search-header-collapsed');
-        searchHeader.classList.add('search-header-expanded');
-      } else {
-        // Entering from somewhere else, just expand normally
+      }
+      searchQuery = '';
+      selectedSearchTag = null;
+      if (searchInput) searchInput.value = '';
+      renderSearchTags();
+      renderSearchFeed(); // Instantly show all cards
+    } else if (hash === '/search') {
+      // Search selected: Smoothly expand search bar and focus it
+      if (searchHeader) {
         searchHeader.classList.remove('search-header-collapsed');
         searchHeader.classList.add('search-header-expanded');
       }
+      if (!noAnimate && searchInput) {
+        setTimeout(() => searchInput.focus(), 400);
+      }
+    }
+  } else {
+    // Add or Profile views selected
+    if (homeView) homeView.style.display = 'none';
+    const activeView = hash === '/add' ? addView : profileView;
+    if (activeView) {
+      activeView.style.display = 'block';
+      void activeView.offsetWidth;
+      if (!noAnimate) {
+        activeView.style.animation = 'fade-in-up 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) forwards';
+      }
     }
   }
-  
+
   updateNavIndicator(hash, noAnimate);
   setTimeout(setMasonrySpans, 50);
 }
@@ -393,7 +382,6 @@ function scheduleMasonryUpdate() {
   masonryTimeout = setTimeout(setMasonrySpans, 100);
 }
 
-// Extract unique tags natively from all user entries
 let availableTags = [];
 function updateAvailableTags() {
   const tags = new Set();
@@ -554,13 +542,11 @@ function createCardElement(item) {
 
 function renderFeed() {
   feedGrid.innerHTML = '';
-  searchFeedGrid.innerHTML = '';
   
   updateAvailableTags();
 
   entries.forEach(item => {
     feedGrid.appendChild(createCardElement(item));
-    searchFeedGrid.appendChild(createCardElement(item));
   });
 
   renderTags(); 
@@ -582,10 +568,9 @@ function renderFeed() {
 
 function renderSearchFeed() {
   const query = searchQuery.toLowerCase();
-  const items = searchFeedGrid.querySelectorAll('.masonry-item');
+  const items = feedGrid.querySelectorAll('.masonry-item');
   let visibleCount = 0;
 
-  // Toggle display cleanly without rebuilding DOM to stop blinking!
   items.forEach(itemDiv => {
     const article = itemDiv.querySelector('article');
     if (!article) return;
@@ -614,14 +599,14 @@ function renderSearchFeed() {
     }
   });
 
-  let noResultsMsg = searchFeedGrid.querySelector('.no-results-msg');
+  let noResultsMsg = feedGrid.querySelector('.no-results-msg');
   if (visibleCount === 0) {
     if (!noResultsMsg) {
       noResultsMsg = document.createElement('p');
       noResultsMsg.className = 'no-results-msg font-body-md';
       noResultsMsg.style.cssText = 'grid-column: 1 / -1; text-align: center; color: var(--outline); margin-top: 40px;';
       noResultsMsg.textContent = 'No entries found.';
-      searchFeedGrid.appendChild(noResultsMsg);
+      feedGrid.appendChild(noResultsMsg);
     }
     noResultsMsg.style.display = 'block';
   } else if (noResultsMsg) {
