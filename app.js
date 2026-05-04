@@ -23,12 +23,14 @@ const authOverlay = document.getElementById('auth-overlay');
 const btnLogin = document.getElementById('btn-login');
 const authStatus = document.getElementById('auth-status');
 const feedGrid = document.getElementById('feed-grid');
+const searchFeedGrid = document.getElementById('search-feed-grid'); // Separated Search Grid
 const searchTagsContainer = document.getElementById('search-tags-container'); 
 const searchInput = document.getElementById('search-input'); 
+const searchHeader = document.getElementById('search-header');
 
 const views = {
   '/': document.getElementById('view-home'),
-  '/search': document.getElementById('view-home'), 
+  '/search': document.getElementById('view-search'), // Restored isolated view-search
   '/add': document.getElementById('view-add'),
   '/profile': document.getElementById('view-profile')
 };
@@ -116,7 +118,8 @@ window.onload = function () {
   gisInited = true;
   maybeEnableButtons();
 
-  handleRoute(true);
+  setTimeout(() => handleRoute(true), 150);
+  setTimeout(() => handleRoute(true), 500); 
 };
 
 async function initGoogleDriveClient() {
@@ -272,7 +275,6 @@ function handleRoute(noAnimate = false) {
   if (typeof noAnimate !== 'boolean') noAnimate = false;
   
   const hash = window.location.hash.replace('#', '') || '/';
-  const searchHeader = document.getElementById('search-header');
 
   if (hash !== '/add' && editingId) {
     editingId = null;
@@ -283,6 +285,7 @@ function handleRoute(noAnimate = false) {
 
   window.scrollTo({ top: 0, behavior: 'instant' });
 
+  // Strictly isolate all views
   Object.values(views).forEach(v => {
     if (v) {
       v.style.display = 'none';
@@ -292,40 +295,42 @@ function handleRoute(noAnimate = false) {
 
   const activeView = views[hash] || views['/'];
 
-  if (hash === '/' || hash === '/search') {
-    if (activeView) activeView.style.display = 'block';
-
-    if (hash === '/') {
+  if (activeView) {
+    activeView.style.display = 'block';
+    
+    // Animate Search tab specifically
+    if (hash === '/search') {
       if (searchHeader) {
         searchHeader.classList.remove('search-header-expanded');
         searchHeader.classList.add('search-header-collapsed');
+        
+        // Slight delay to let the grid render, then drop the search bar smoothly
+        setTimeout(() => {
+          searchHeader.classList.remove('search-header-collapsed');
+          searchHeader.classList.add('search-header-expanded');
+          setTimeout(setMasonrySpans, 400); // Recalculate after drop finishes
+        }, 50);
       }
+    } 
+    // Animate Add/Profile views
+    else if (hash === '/add' || hash === '/profile') {
+      void activeView.offsetWidth;
+      if (!noAnimate) activeView.style.animation = 'fade-in-up 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) forwards';
+    } 
+    // Reset Search data if going back to Home
+    else if (hash === '/') {
       searchQuery = '';
       selectedSearchTag = null;
       if (searchInput) searchInput.value = '';
       renderSearchTags();
       renderSearchFeed(); 
-    } else if (hash === '/search') {
-      if (searchHeader) {
-        searchHeader.classList.remove('search-header-collapsed');
-        searchHeader.classList.add('search-header-expanded');
-      }
-      renderSearchTags();
     }
-  } else {
-    if (activeView) {
-      activeView.style.display = 'block';
-      void activeView.offsetWidth;
-      if (!noAnimate) {
-        activeView.style.animation = 'fade-in-up 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) forwards';
-      }
-    }
+
+    // Crucial: Calculate masonry spans immediately upon making a view block
+    setMasonrySpans();
   }
 
   updateNavIndicator(hash, noAnimate);
-  
-  // Update spans instantly to avoid visual tearing on tab switch
-  setMasonrySpans();
 }
 
 function updateNavIndicator(hash, noAnimate = false) {
@@ -364,26 +369,26 @@ function updateNavIndicator(hash, noAnimate = false) {
   }
 }
 
-// --- DOM BATCHING ENGINE (Fixes the lag and stuttering!) ---
+// --- DOM BATCHING ENGINE (Fixes Layout Thrashing & Hard Refresh Glitch) ---
 function setMasonrySpans() {
   const rowSize = 4;
-  const items = Array.from(document.querySelectorAll('.masonry-item')).filter(item => item.style.display !== 'none');
+  
+  // Only measure items that are currently painted by the browser
+  const items = Array.from(document.querySelectorAll('.masonry-item')).filter(item => {
+    return item.offsetParent !== null && item.style.display !== 'none';
+  });
   
   if (items.length === 0) return;
 
-  // 1. Batch Write: Reset all spans first
   items.forEach(item => item.style.gridRowEnd = '');
 
-  // 2. Batch Read: Gather all natural heights (Forces exactly ONE layout reflow)
   const heights = items.map(item => {
     const article = item.children[0];
     return article ? article.getBoundingClientRect().height : 0;
   });
 
-  // 3. Batch Read: Get margin safely once
   const marginBottom = parseFloat(window.getComputedStyle(items[0]).marginBottom) || 12;
 
-  // 4. Batch Write: Apply all calculated spans simultaneously
   items.forEach((item, i) => {
     if (heights[i] > 0) {
       const spans = Math.ceil((heights[i] + marginBottom) / rowSize);
@@ -392,10 +397,10 @@ function setMasonrySpans() {
   });
 }
 
-let masonryFrame = null;
+let masonryTimeout = null;
 function scheduleMasonryUpdate() {
-  if (masonryFrame) cancelAnimationFrame(masonryFrame);
-  masonryFrame = requestAnimationFrame(() => setMasonrySpans());
+  clearTimeout(masonryTimeout);
+  masonryTimeout = setTimeout(setMasonrySpans, 100);
 }
 
 let availableTags = [];
@@ -548,29 +553,38 @@ function createCardElement(item) {
 }
 
 function renderFeed() {
-  feedGrid.innerHTML = '';
+  if (feedGrid) feedGrid.innerHTML = '';
+  if (searchFeedGrid) searchFeedGrid.innerHTML = '';
+  
   updateAvailableTags();
-  entries.forEach(item => feedGrid.appendChild(createCardElement(item)));
+
+  // Populate both separated grids natively
+  entries.forEach(item => {
+    if (feedGrid) feedGrid.appendChild(createCardElement(item));
+    if (searchFeedGrid) searchFeedGrid.appendChild(createCardElement(item));
+  });
 
   renderTags(); 
   renderSearchTags(); 
   renderSearchFeed();
 
-  // Instant layout application
-  setMasonrySpans();
+  applySelectionStyles();
 
-  // Listeners for deferred image loads
-  document.querySelectorAll('img').forEach(img => {
-    if (!img.complete) {
-      img.addEventListener('load', scheduleMasonryUpdate, { once: true });
-      img.addEventListener('error', scheduleMasonryUpdate, { once: true });
-    }
+  requestAnimationFrame(() => {
+    setMasonrySpans();
+    document.querySelectorAll('img').forEach(img => {
+      if (!img.complete) {
+        img.addEventListener('load', scheduleMasonryUpdate, { once: true });
+        img.addEventListener('error', scheduleMasonryUpdate, { once: true });
+      }
+    });
   });
 }
 
 function renderSearchFeed() {
+  if (!searchFeedGrid) return;
   const query = searchQuery.toLowerCase();
-  const items = feedGrid.querySelectorAll('.masonry-item');
+  const items = searchFeedGrid.querySelectorAll('.masonry-item');
   let visibleCount = 0;
 
   items.forEach(itemDiv => {
@@ -598,14 +612,14 @@ function renderSearchFeed() {
     }
   });
 
-  let noResultsMsg = feedGrid.querySelector('.no-results-msg');
+  let noResultsMsg = searchFeedGrid.querySelector('.no-results-msg');
   if (visibleCount === 0) {
     if (!noResultsMsg) {
       noResultsMsg = document.createElement('p');
       noResultsMsg.className = 'no-results-msg font-body-md';
       noResultsMsg.style.cssText = 'grid-column: 1 / -1; text-align: center; color: var(--outline); margin-top: 40px;';
       noResultsMsg.textContent = 'No entries found.';
-      feedGrid.appendChild(noResultsMsg);
+      searchFeedGrid.appendChild(noResultsMsg);
     }
     noResultsMsg.style.display = 'block';
   } else if (noResultsMsg) {
@@ -613,7 +627,7 @@ function renderSearchFeed() {
   }
 
   applySelectionStyles();
-  setMasonrySpans(); // Synchronous layout calculation
+  setMasonrySpans();
 }
 
 function applySelectionStyles() {
