@@ -58,6 +58,12 @@ const detailContent = document.getElementById('detail-content');
 const btnSheetClose = document.getElementById('btn-sheet-close');
 const btnSheetEdit = document.getElementById('btn-sheet-edit');
 
+const tagEditBackdrop = document.getElementById('tag-edit-backdrop');
+const tagEditModal = document.getElementById('tag-edit-modal');
+const tagEditInput = document.getElementById('tag-edit-input');
+const btnTagEditCancel = document.getElementById('btn-tag-edit-cancel');
+const btnTagEditSave = document.getElementById('btn-tag-edit-save');
+
 // --- Helper: Extract Drive ID robustly and clean up artificial zeros ---
 function extractDriveId(url) {
   if (!url) return null;
@@ -847,6 +853,44 @@ function closeDetailSheet(fromHistory = false) {
 detailBackdrop.addEventListener('click', () => closeDetailSheet(false));
 btnSheetClose.addEventListener('click', () => closeDetailSheet(false));
 
+// --- Custom Prompt Modal Logic ---
+function openEditTagModal(oldTag) {
+  return new Promise((resolve) => {
+    tagEditInput.value = oldTag;
+    tagEditBackdrop.style.pointerEvents = 'auto';
+    tagEditBackdrop.style.opacity = '1';
+    tagEditModal.style.transform = 'scale(1)';
+    tagEditModal.style.opacity = '1';
+    
+    // Auto-focus input
+    setTimeout(() => { 
+      tagEditInput.focus(); 
+      tagEditInput.select(); 
+    }, 100);
+
+    const cleanup = () => {
+      tagEditBackdrop.style.opacity = '0';
+      tagEditModal.style.transform = 'scale(0.95)';
+      tagEditModal.style.opacity = '0';
+      tagEditBackdrop.style.pointerEvents = 'none';
+      btnTagEditCancel.removeEventListener('click', onCancel);
+      btnTagEditSave.removeEventListener('click', onSave);
+      tagEditInput.removeEventListener('keydown', onKeyDown);
+    };
+
+    const onCancel = () => { cleanup(); resolve(null); };
+    const onSave = () => { cleanup(); resolve(tagEditInput.value); };
+    const onKeyDown = (e) => {
+      if (e.key === 'Enter') onSave();
+      if (e.key === 'Escape') onCancel();
+    };
+
+    btnTagEditCancel.addEventListener('click', onCancel);
+    btnTagEditSave.addEventListener('click', onSave);
+    tagEditInput.addEventListener('keydown', onKeyDown);
+  });
+}
+
 // --- Edit Entry Logic ---
 function startEditMode(id) {
   const entry = entries.find(e => e.id === id);
@@ -1261,7 +1305,8 @@ if (btnEditTag) {
   btnEditTag.addEventListener('click', async () => {
     if (selectedTags.length !== 1) return;
     const oldTag = selectedTags[0];
-    const newTag = prompt('Enter new tag name:', oldTag);
+    
+    const newTag = await openEditTagModal(oldTag);
     
     if (!newTag || newTag.trim() === '' || newTag === oldTag) {
       selectedTags = [];
