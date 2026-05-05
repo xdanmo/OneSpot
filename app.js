@@ -315,7 +315,7 @@ function handleRoute(noAnimate = false) {
 
   if (hash !== '/add' && editingId) {
     editingId = null;
-    btnSaveEntry.textContent = 'Save Entry';
+    btnSaveEntry.textContent = 'Save Post';
     addText.value = ''; addLink.value = ''; addImage.value = ''; addImageUrl = ''; addTags = [];
     renderAddPreview(); renderTags();
   }
@@ -450,7 +450,6 @@ function renderSearchTags() {
     const btn = document.createElement('button');
     const isSelected = selectedSearchTags.includes(tag);
     
-    // Removed shadow-ambient and flat backgrounds for a cleaner blend
     btn.className = 'font-label-sm';
     btn.textContent = tag;
     btn.style.cssText = `
@@ -640,7 +639,7 @@ function renderSearchFeed() {
       noResultsMsg = document.createElement('p');
       noResultsMsg.className = 'no-results-msg font-body-md';
       noResultsMsg.style.cssText = 'grid-column: 1 / -1; text-align: center; color: var(--outline); margin-top: 40px;';
-      noResultsMsg.textContent = 'No entries found.';
+      noResultsMsg.textContent = 'No posts found.';
       feedGrid.appendChild(noResultsMsg);
     }
     noResultsMsg.style.display = 'block';
@@ -798,7 +797,7 @@ function startEditMode(id) {
   pendingImageFile = null;
   addImage.value = ''; 
 
-  btnSaveEntry.textContent = 'Update Entry';
+  btnSaveEntry.textContent = 'Update Post';
   
   if (isDetailSheetOpen) {
     closeDetailSheet(true); 
@@ -1016,7 +1015,7 @@ btnSaveEntry.addEventListener('click', async () => {
         entries[index].tags = [...addTags];
         entries[index].type = addTags[0] || 'Note';
       }
-      successMessage = 'Entry updated!'; 
+      successMessage = 'Post updated!'; 
     } else {
       entries.unshift({
         id: Date.now().toString(),
@@ -1027,14 +1026,14 @@ btnSaveEntry.addEventListener('click', async () => {
         tags: [...addTags],
         type: addTags[0] || 'Note'
       });
-      successMessage = 'Entry saved!'; 
+      successMessage = 'Post saved!'; 
     }
 
     await saveDataToDrive();
 
     addText.value = ''; addLink.value = ''; addImage.value = ''; addImageUrl = ''; 
     pendingImageFile = null; addTags = []; editingId = null;
-    btnSaveEntry.textContent = 'Save Entry';
+    btnSaveEntry.textContent = 'Save Post';
     
     updateAvailableTags(); 
     renderAddPreview();
