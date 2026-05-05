@@ -661,14 +661,17 @@ function applySelectionStyles() {
     if (inSelectionMode) article.classList.remove('card-hover');
     else article.classList.add('card-hover');
 
-    let overlay = article.querySelector('.sel-overlay');
+    const isImagePost = article.style.backgroundColor === 'transparent';
+    const targetElement = isImagePost ? article.querySelector('.shadow-ambient') : article;
+
+    let overlay = targetElement.querySelector('.sel-overlay');
     if (isSelected && !overlay) {
       overlay = document.createElement('div');
       overlay.className = 'sel-overlay';
       overlay.style.cssText = 'position:absolute;inset:0;z-index:30;background:rgba(0,0,0,0.4);border-radius:inherit;pointer-events:none;';
-      article.prepend(overlay);
-    } else if (!isSelected && overlay) {
-      overlay.remove();
+      targetElement.prepend(overlay);
+    } else if (!isSelected) {
+      article.querySelectorAll('.sel-overlay').forEach(o => o.remove());
     }
   });
 }
