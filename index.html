@@ -18,19 +18,29 @@
     <!-- UNIFIED HOME DASHBOARD -->
     <main class="feed-container" id="view-home">
       
-      <!-- Persistent Inline Search & Tags Header -->
+      <!-- Persistent Search & Tags Header -->
       <div id="search-header" style="margin-bottom: 12px; padding: 0 4px;">
         <div class="search-content">
-          <!-- Horizontal Scrollable Container for Search Pill and Tags -->
+          
+          <!-- Global Posts Search Bar -->
+          <div style="max-width: 600px; margin: 0 auto 16px; position: relative;">
+            <span class="material-symbols-outlined" style="position: absolute; left: 16px; top: 50%; transform: translateY(-50%); color: var(--outline-variant); pointer-events: none;">search</span>
+            <input type="text" id="feed-search-input" placeholder="Search entries by title or link..." class="font-body-md shadow-ambient"
+              style="width: 100%; background-color: var(--surface-container-highest); border: 1px solid transparent; border-radius: var(--rounded-full); padding: 14px 16px 14px 48px; color: var(--on-surface); outline: none; transition: all 0.2s;"
+              onfocus="this.style.backgroundColor='var(--surface-container)'; this.style.borderColor='var(--outline-variant)';"
+              onblur="this.style.backgroundColor='var(--surface-container-highest)'; this.style.borderColor='transparent';" />
+          </div>
+
+          <!-- Horizontal Scrollable Container for Tag Filter and Tags -->
           <div class="hide-scroll" style="max-width: 600px; margin: 0 auto; display: flex; flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; gap: 8px; align-items: center; padding-bottom: 8px;">
             
-            <!-- "Find" Search Pill (Acts as first tag) -->
+            <!-- Inline "Find tags" Pill -->
             <div style="position: relative; flex-shrink: 0; display: flex; align-items: center;">
-              <span class="material-symbols-outlined" style="position: absolute; left: 12px; color: var(--on-surface-variant); pointer-events: none; font-size: 18px;">search</span>
-              <input type="text" id="search-input" placeholder="Find..." class="font-label-sm shadow-ambient"
-                style="width: 110px; background-color: var(--surface-container-highest); border: 1px solid transparent; border-radius: var(--rounded-full); padding: 10px 16px 10px 36px; color: var(--on-surface); outline: none; transition: all 0.3s cubic-bezier(0.2, 0.8, 0.2, 1); margin: 0;"
-                onfocus="this.style.width='200px'; this.style.backgroundColor='var(--surface-container)'; this.style.borderColor='var(--outline-variant)';"
-                onblur="if(!this.value) { this.style.width='110px'; this.style.backgroundColor='var(--surface-container-highest)'; this.style.borderColor='transparent'; }" />
+              <span class="material-symbols-outlined" style="position: absolute; left: 12px; color: var(--on-surface-variant); pointer-events: none; font-size: 18px;">filter_alt</span>
+              <input type="text" id="tag-search-input" placeholder="Find tags..." class="font-label-sm shadow-ambient"
+                style="width: 115px; background-color: var(--surface-container-highest); border: 1px solid transparent; border-radius: var(--rounded-full); padding: 10px 16px 10px 36px; color: var(--on-surface); outline: none; transition: all 0.3s cubic-bezier(0.2, 0.8, 0.2, 1); margin: 0;"
+                onfocus="this.style.width='160px'; this.style.backgroundColor='var(--surface-container)'; this.style.borderColor='var(--outline-variant)';"
+                onblur="if(!this.value) { this.style.width='115px'; this.style.backgroundColor='var(--surface-container-highest)'; this.style.borderColor='transparent'; }" />
             </div>
 
             <!-- Dynamic Tags Container -->
