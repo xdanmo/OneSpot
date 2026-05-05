@@ -240,4 +240,4 @@ input { font-family: inherit; }
   opacity: 1;
   transform: translateY(0) scale(1);
 }
-.search-content { padding-bottom: 24px; }
+.search-content { padding-bottom: 0; }
