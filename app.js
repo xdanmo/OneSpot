@@ -17,7 +17,7 @@ let selectedSearchTag = null;
 let isDetailSheetOpen = false;
 let editingId = null; 
 let currentDetailId = null; 
-let isToastActive = false; // Prevents nav indicator from reappearing during toasts
+let isToastActive = false;
 
 // DOM Elements
 const authOverlay = document.getElementById('auth-overlay');
@@ -52,12 +52,19 @@ const btnSheetEdit = document.getElementById('btn-sheet-edit');
 // --- Helper: Extract Drive ID robustly and clean up artificial zeros ---
 function extractDriveId(url) {
   if (!url) return null;
-  let id = null;
 
+  // If the string is already just a raw Drive ID (e.g., from DB corruption)
+  if (/^[a-zA-Z0-9_-]{28,35}$/.test(url)) {
+    let id = url;
+    if (id.length === 34 && id.startsWith('0')) return id.substring(1);
+    return id;
+  }
+
+  let id = null;
   const thumbnailMatch = url.match(/thumbnail\?id=([^&]+)/);
   const ucMatch = url.match(/[?&]id=([^&]+)/);
   const lh3Match = url.match(/lh3\.googleusercontent\.com\/d\/([^/?]+)/);
-  const profileMatch = url.match(/profile\/picture\/([^/?]+)/);
+  const profileMatch = url.match(/profile\/picture\/(?:0)?([^/?]+)/); 
   const driveIdMatch = url.match(/drive_id:(.+)/);
 
   if (thumbnailMatch) id = thumbnailMatch[1];
@@ -70,8 +77,7 @@ function extractDriveId(url) {
     if (parts.length > 1) id = parts[1];
   }
 
-  // FIX: Strip the artificial '0' that was prepended in the very first version of the app.
-  // Real Drive IDs are 33 characters. If it's 34 and starts with 0, the 0 is fake.
+  // Strip the artificial '0' that was prepended in the very first version
   if (id && id.length === 34 && id.startsWith('0')) {
     id = id.substring(1);
   }
@@ -166,7 +172,6 @@ function maybeEnableButtons() {
       try {
         const tokenInfo = JSON.parse(saved);
         
-        // FIX: If token is expired, clear it and force physical button click to prevent popup block
         if (Date.now() > tokenInfo.expires_at) {
            console.log("Token expired, requiring manual re-auth.");
            localStorage.removeItem('onespot_token');
@@ -188,7 +193,6 @@ function maybeEnableButtons() {
 }
 
 btnLogin.onclick = () => {
-  // FIX: This physical click event guarantees the popup won't be blocked
   tokenClient.requestAccessToken({ prompt: 'consent' });
 };
 
@@ -256,7 +260,6 @@ async function initializeDrive() {
   } catch (err) {
     console.error('Drive API Error:', err);
     if (err.status === 401 || (err.result && err.result.error && err.result.error.code === 401)) {
-      // FIX: Force manual logout on 401 to prevent popup blocks
       localStorage.removeItem('onespot_token');
       authStatus.style.display = 'none';
       btnLogin.style.display = 'block';
@@ -302,10 +305,8 @@ async function uploadImageToDrive(file) {
   });
 
   authOverlay.style.display = 'none';
-  // Safari friendly stable thumbnail URL
   return `https://drive.google.com/thumbnail?id=${data.id}&sz=w1000`;
 }
-
 
 // --- Routing & UI Orchestrated Animations ---
 function handleRoute(noAnimate = false) {
@@ -362,9 +363,6 @@ function handleRoute(noAnimate = false) {
   }
 
   updateNavIndicator(hash, noAnimate);
-  
-  // Instantly apply masonry fix to avoid visual layout thrashing bounce, 
-  // with a brief delayed backup in case of image rendering.
   setMasonrySpans(); 
   setTimeout(setMasonrySpans, 50);
 }
@@ -397,7 +395,6 @@ function updateNavIndicator(hash, noAnimate = false) {
     navIndicator.style.width = activeLink.offsetWidth + 'px';
     navIndicator.style.height = activeLink.offsetHeight + 'px';
     
-    // Only reveal the indicator if a toast is NOT currently hiding it
     if (!isToastActive) {
       navIndicator.style.opacity = '1';
     }
@@ -413,7 +410,6 @@ function setMasonrySpans() {
   const rowSize = 4;
   const updates = [];
   
-  // Phase 1: Read Layout Metrics (avoids layout thrashing)
   document.querySelectorAll('.masonry-item').forEach(item => {
     const article = item.children[0];
     if (!article) return;
@@ -427,7 +423,6 @@ function setMasonrySpans() {
     }
   });
 
-  // Phase 2: Batch Write DOM changes
   updates.forEach(({ item, spans }) => {
     item.style.gridRowEnd = `span ${spans}`;
   });
@@ -685,7 +680,6 @@ function updateSelectionState(instant = false) {
     if (btnEdit) btnEdit.style.display = selectedIds.length === 1 ? 'block' : 'none';
   } else {
     if (instant) {
-      // Instant hide selection bar, instant show bottom nav
       selectionBar.style.transition = 'none';
       selectionBar.style.transform = 'translateY(200%)'; 
       selectionBar.style.display = 'none';
@@ -693,17 +687,14 @@ function updateSelectionState(instant = false) {
       bottomNav.style.transition = 'none';
       bottomNav.style.transform = 'translateY(0)'; 
       
-      // Force layout recalculation so the 'none' transitions apply immediately
       void bottomNav.offsetWidth;
       void selectionBar.offsetWidth;
       
-      // Restore the smooth transitions for future use
       bottomNav.style.transition = 'transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)';
       selectionBar.style.transition = 'transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)';
       
       updateNavIndicator(window.location.hash.replace('#', '') || '/', true);
     } else {
-      // Animated hide/show
       selectionBar.style.transition = 'transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)';
       selectionBar.style.transform = 'translateY(200%)'; 
       
@@ -781,7 +772,6 @@ function closeDetailSheet(fromHistory = false) {
 detailBackdrop.addEventListener('click', () => closeDetailSheet(false));
 btnSheetClose.addEventListener('click', () => closeDetailSheet(false));
 
-
 // --- Edit Entry Logic ---
 function startEditMode(id) {
   const entry = entries.find(e => e.id === id);
@@ -802,7 +792,7 @@ function startEditMode(id) {
   if (isDetailSheetOpen) closeDetailSheet(false);
   if (selectedIds.length > 0) {
     selectedIds = [];
-    updateSelectionState(true); // <--- Instantly replace with nav bar
+    updateSelectionState(true);
   }
   
   window.location.hash = '#/add';
@@ -817,7 +807,6 @@ btnEdit.addEventListener('click', () => {
 btnSheetEdit.addEventListener('click', () => {
   if (currentDetailId) startEditMode(currentDetailId);
 });
-
 
 // --- Add Entry Logic ---
 let addTags = [];
@@ -991,7 +980,7 @@ btnSaveEntry.addEventListener('click', async () => {
   btnSaveEntry.style.pointerEvents = 'none';
 
   let finalImageUrl = addImageUrl;
-  let successMessage = ''; // Added to store the message
+  let successMessage = ''; 
 
   try {
     if (pendingImageFile) finalImageUrl = await uploadImageToDrive(pendingImageFile);
@@ -1006,7 +995,7 @@ btnSaveEntry.addEventListener('click', async () => {
         entries[index].tags = [...addTags];
         entries[index].type = addTags[0] || 'Note';
       }
-      successMessage = 'Entry updated!'; // Store instead of showing
+      successMessage = 'Entry updated!'; 
     } else {
       entries.unshift({
         id: Date.now().toString(),
@@ -1017,7 +1006,7 @@ btnSaveEntry.addEventListener('click', async () => {
         tags: [...addTags],
         type: addTags[0] || 'Note'
       });
-      successMessage = 'Entry saved!'; // Store instead of showing
+      successMessage = 'Entry saved!'; 
     }
 
     await saveDataToDrive();
@@ -1034,7 +1023,7 @@ btnSaveEntry.addEventListener('click', async () => {
     handleRoute();
     renderFeed();
     
-    showToast(successMessage); // Show the toast AFTER redirecting and rendering
+    showToast(successMessage); 
   } catch (err) {
     showToast('Failed to save. Try again.');
   } finally {
@@ -1089,12 +1078,12 @@ btnDelete.addEventListener('click', async () => {
   authOverlay.style.display = 'none';
   showToast(`${count} item(s) deleted`);
   renderFeed();
-  updateSelectionState(true); // <--- Instantly replace with nav bar after overlay disappears
+  updateSelectionState(true); 
 });
 
 btnCloseSelection.addEventListener('click', () => {
   selectedIds = [];
-  updateSelectionState(); // <--- Uses default (animated) fallback
+  updateSelectionState(); 
 });
 
 document.getElementById('btn-logout').addEventListener('click', () => {
