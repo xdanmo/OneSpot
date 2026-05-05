@@ -13,7 +13,7 @@ let selectedIds = [];
 let isInitialRender = true;
 let lastSelectionTime = 0;
 let searchQuery = ''; 
-let selectedSearchTag = null; 
+let selectedSearchTags = []; // Now supports multiple tag selections
 let isDetailSheetOpen = false;
 let editingId = null; 
 let currentDetailId = null; 
@@ -430,27 +430,40 @@ function renderSearchTags() {
   if (!searchTagsContainer) return;
   searchTagsContainer.innerHTML = '';
   
-  availableTags.forEach(tag => {
+  // Sort tags so selected ones appear first
+  let sortedTags = [...availableTags].sort((a, b) => {
+    const aSel = selectedSearchTags.includes(a);
+    const bSel = selectedSearchTags.includes(b);
+    if (aSel && !bSel) return -1;
+    if (!aSel && bSel) return 1;
+    return a.localeCompare(b);
+  });
+  
+  sortedTags.forEach(tag => {
     const btn = document.createElement('button');
-    const isSelected = tag === selectedSearchTag;
+    const isSelected = selectedSearchTags.includes(tag);
     
     btn.className = 'font-label-sm shadow-ambient';
     btn.textContent = tag;
     btn.style.cssText = `
-      background-color: ${isSelected ? 'var(--primary)' : 'var(--surface-container-low)'}; 
+      background-color: ${isSelected ? 'var(--primary)' : 'var(--surface-container-highest)'}; 
       color: ${isSelected ? 'var(--on-primary)' : 'var(--on-surface)'}; 
       border: 1px solid transparent; 
       border-radius: var(--rounded-full); 
-      padding: 8px 16px; 
+      padding: 10px 16px; 
       cursor: pointer; 
       transition: all 0.2s;
       flex-shrink: 0;
     `;
     
     btn.onclick = () => {
-      selectedSearchTag = (selectedSearchTag === tag) ? null : tag;
-      renderSearchTags();
-      renderSearchFeed();
+      if (isSelected) {
+        selectedSearchTags = selectedSearchTags.filter(t => t !== tag);
+      } else {
+        selectedSearchTags.push(tag);
+      }
+      renderSearchTags(); // Re-render to update sorts and active states
+      renderSearchFeed(); // Update the filter feed
     };
     
     searchTagsContainer.appendChild(btn);
@@ -593,9 +606,10 @@ function renderSearchFeed() {
                      (entry.url && entry.url.toLowerCase().includes(query));
     }
     
+    // Strict match: items must have ALL selected tags
     let matchesTag = true;
-    if (selectedSearchTag) {
-      matchesTag = entry.tags && entry.tags.includes(selectedSearchTag);
+    if (selectedSearchTags.length > 0) {
+      matchesTag = entry.tags && selectedSearchTags.every(t => entry.tags.includes(t));
     }
     
     if (matchesQuery && matchesTag) {
@@ -773,8 +787,8 @@ function startEditMode(id) {
   btnSaveEntry.textContent = 'Update Entry';
   
   if (isDetailSheetOpen) {
-    closeDetailSheet(true); // Close the sheet without triggering history.back()
-    history.replaceState(null, '', '#/add'); // Replace the modal's history state with the new route
+    closeDetailSheet(true); // Close without popping history stack
+    history.replaceState(null, '', '#/add'); // Replace the modal history state cleanly
     handleRoute();
   } else {
     window.location.hash = '#/add';
