@@ -17,6 +17,7 @@ let selectedSearchTag = null;
 let isDetailSheetOpen = false;
 let editingId = null; 
 let currentDetailId = null; 
+let isToastActive = false; // Prevents nav indicator from reappearing during toasts
 
 // DOM Elements
 const authOverlay = document.getElementById('auth-overlay');
@@ -55,12 +56,14 @@ function showToast(message) {
   
   if (!navToast) return;
   
+  isToastActive = true;
   navToast.textContent = message;
   navToast.style.opacity = '1';
   if (navIndicator) navIndicator.style.opacity = '0';
   navLinks.forEach(l => l.style.opacity = '0'); 
   
   setTimeout(() => {
+    isToastActive = false;
     navToast.style.opacity = '0';
     if (navIndicator) navIndicator.style.opacity = '1';
     navLinks.forEach(l => l.style.opacity = '1'); 
@@ -362,7 +365,11 @@ function updateNavIndicator(hash, noAnimate = false) {
     navIndicator.style.top = activeLink.offsetTop + 'px';
     navIndicator.style.width = activeLink.offsetWidth + 'px';
     navIndicator.style.height = activeLink.offsetHeight + 'px';
-    navIndicator.style.opacity = '1';
+    
+    // Only reveal the indicator if a toast is NOT currently hiding it
+    if (!isToastActive) {
+      navIndicator.style.opacity = '1';
+    }
 
     if (noAnimate) {
       void navIndicator.offsetWidth; 
