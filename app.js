@@ -328,6 +328,10 @@ function handleRoute(noAnimate = false) {
   }
 
   updateNavIndicator(hash, noAnimate);
+  
+  // Instantly apply masonry fix to avoid visual layout thrashing bounce, 
+  // with a brief delayed backup in case of image rendering.
+  setMasonrySpans(); 
   setTimeout(setMasonrySpans, 50);
 }
 
@@ -369,8 +373,10 @@ function updateNavIndicator(hash, noAnimate = false) {
 
 function setMasonrySpans() {
   const rowSize = 4;
+  const updates = [];
+  
+  // Phase 1: Read Layout Metrics (avoids layout thrashing)
   document.querySelectorAll('.masonry-item').forEach(item => {
-    item.style.gridRowEnd = '';
     const article = item.children[0];
     if (!article) return;
     
@@ -379,8 +385,13 @@ function setMasonrySpans() {
     
     if (contentHeight > 0) {
       const spans = Math.ceil((contentHeight + marginBottom) / rowSize);
-      item.style.gridRowEnd = `span ${spans}`;
+      updates.push({ item, spans });
     }
+  });
+
+  // Phase 2: Batch Write DOM changes
+  updates.forEach(({ item, spans }) => {
+    item.style.gridRowEnd = `span ${spans}`;
   });
 }
 
