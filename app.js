@@ -49,6 +49,24 @@ const detailContent = document.getElementById('detail-content');
 const btnSheetClose = document.getElementById('btn-sheet-close');
 const btnSheetEdit = document.getElementById('btn-sheet-edit');
 
+// --- Helper: Extract Drive ID ---
+function extractDriveId(url) {
+  if (!url) return null;
+  const ucMatch = url.match(/[?&]id=([^&]+)/);
+  if (ucMatch) return ucMatch[1];
+  const lh3Match = url.match(/lh3\.googleusercontent\.com\/d\/([^/?]+)/);
+  if (lh3Match) return lh3Match[1];
+  const oldProfileMatch = url.match(/profile\/picture\/0([^/?]+)/);
+  if (oldProfileMatch) return oldProfileMatch[1];
+  const driveIdMatch = url.match(/drive_id:(.+)/);
+  if (driveIdMatch) return driveIdMatch[1];
+  if (url.includes('googleusercontent') && url.includes('/0')) {
+    const parts = url.split('/0');
+    if (parts.length > 1) return parts[1];
+  }
+  return null;
+}
+
 // --- Dynamic Island Toast Notification ---
 function showToast(message) {
   const navToast = document.getElementById('nav-toast');
@@ -272,7 +290,7 @@ async function uploadImageToDrive(file) {
   });
 
   authOverlay.style.display = 'none';
-  return `https://googleusercontent.com/profile/picture/0${data.id}`;
+  return `https://lh3.googleusercontent.com/d/${data.id}`;
 }
 
 
@@ -459,19 +477,8 @@ function createCardElement(item) {
   const itemDiv = document.createElement('div');
   itemDiv.className = 'masonry-item';
 
-  let driveId = null;
-  let imgSource = item.image;
-  if (item.image) {
-    const ucMatch = item.image.match(/[?&]id=([^&]+)/);
-    const lh3Match = item.image.match(/lh3\.googleusercontent\.com\/d\/([^/?]+)/);
-    if (ucMatch) { driveId = ucMatch[1]; imgSource = `https://googleusercontent.com/profile/picture/0${driveId}`; }
-    else if (lh3Match) { driveId = lh3Match[1]; imgSource = item.image; }
-    else if (item.image.includes('googleusercontent')) { 
-      imgSource = item.image; 
-      const parts = item.image.split('/0');
-      if (parts.length > 1) driveId = parts[1];
-    }
-  }
+  let driveId = extractDriveId(item.image);
+  let imgSource = driveId ? `https://lh3.googleusercontent.com/d/${driveId}` : item.image;
 
   const article = document.createElement('article');
   article.dataset.id = item.id;
@@ -673,7 +680,7 @@ function updateSelectionState(instant = false) {
       bottomNav.style.transition = 'none';
       bottomNav.style.transform = 'translateY(0)'; 
       
-      // Force layout recalculation so the 'none transitions apply immediately
+      // Force layout recalculation so the 'none' transitions apply immediately
       void bottomNav.offsetWidth;
       void selectionBar.offsetWidth;
       
@@ -717,16 +724,12 @@ function openDetailSheet(item, preloadedSrc = null) {
     let driveId = '';
     
     if (!preloadedSrc) {
-      const ucMatch = item.image.match(/[?&]id=([^&]+)/);
-      const lh3Match = item.image.match(/lh3\.googleusercontent\.com\/d\/([^/?]+)/);
-      if (ucMatch) { 
-        driveId = ucMatch[1];
-        sheetImgSource = `https://googleusercontent.com/profile/picture/0${driveId}`;
-      } else if (lh3Match) { driveId = lh3Match[1]; }
-      else if (item.image.includes('googleusercontent')) {
-        const parts = item.image.split('/0');
-        if (parts.length > 1) driveId = parts[1];
+      driveId = extractDriveId(item.image) || '';
+      if (driveId) {
+        sheetImgSource = `https://lh3.googleusercontent.com/d/${driveId}`;
       }
+    } else {
+      driveId = extractDriveId(item.image) || '';
     }
 
     imgHtml = `
@@ -833,24 +836,16 @@ function renderAddPreview() {
     `;
   } else {
     let previewSrc = addImageUrl;
-    let driveId = '';
-    const ucMatch = addImageUrl.match(/[?&]id=([^&]+)/);
-    const lh3Match = addImageUrl.match(/lh3\.googleusercontent\.com\/d\/([^/?]+)/);
+    let driveId = extractDriveId(addImageUrl) || '';
     
-    if (ucMatch) { 
-      driveId = ucMatch[1]; 
-      previewSrc = `https://googleusercontent.com/profile/picture/0${driveId}`; 
-    } else if (lh3Match) { 
-      driveId = lh3Match[1]; 
-    } else if (addImageUrl.includes('googleusercontent')) { 
-      const parts = addImageUrl.split('/0');
-      if (parts.length > 1) driveId = parts[1];
+    if (driveId) {
+      previewSrc = `https://lh3.googleusercontent.com/d/${driveId}`;
     }
 
     html = `
       <article style="position: relative; background-color: transparent; border-radius: var(--rounded-xl); border: none;">
         <div class="shadow-ambient" style="position: relative; width: 100%; padding-bottom: ${addImageAspectRatio}; background-color: var(--surface-container-low); overflow: hidden; border-radius: var(--rounded-xl);">
-          <img src="${previewSrc}" data-drive-id="${driveId || ''}" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; border-radius: var(--rounded-xl);" onerror="window.handleImageError(this)" />
+          <img src="${previewSrc}" data-drive-id="${driveId}" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; border-radius: var(--rounded-xl);" onerror="window.handleImageError(this)" />
           <div style="position: absolute; bottom: 0; left: 0; width: 100%; padding: 32px 12px 12px; display: flex; flex-direction: column; gap: 6px; z-index: 2;">
             ${link ? `<div class="font-body-md" style="display: flex; align-items: center; gap: 4px; color: rgba(255,255,255,0.95); font-size: 12px; text-shadow: 0 1px 4px rgba(0,0,0,0.8), 0 0 10px rgba(0,0,0,0.5);"><span class="material-symbols-outlined" style="font-size: 14px;">link</span>${link.replace(/^https?:\/\//, '')}</div>` : ''}
           </div>
@@ -1059,18 +1054,15 @@ btnDelete.addEventListener('click', async () => {
 
   const entriesToDelete = entries.filter(e => selectedIds.includes(e.id));
   for (const item of entriesToDelete) {
-    if (item.image) {
-      const match = item.image.match(/id=([^&]+)/) || item.image.match(/drive_id:(.+)/);
-      if (match) {
-        const driveId = match[1];
-        try {
-          await fetch(`https://www.googleapis.com/drive/v3/files/${driveId}`, {
-            method: 'DELETE',
-            headers: { 'Authorization': 'Bearer ' + gapi.client.getToken().access_token }
-          });
-        } catch (e) {
-          console.error("Error deleting image from Drive:", e);
-        }
+    const driveId = extractDriveId(item.image);
+    if (driveId) {
+      try {
+        await fetch(`https://www.googleapis.com/drive/v3/files/${driveId}`, {
+          method: 'DELETE',
+          headers: { 'Authorization': 'Bearer ' + gapi.client.getToken().access_token }
+        });
+      } catch (e) {
+        console.error("Error deleting image from Drive:", e);
       }
     }
   }
