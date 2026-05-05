@@ -450,12 +450,13 @@ function renderSearchTags() {
     const btn = document.createElement('button');
     const isSelected = selectedSearchTags.includes(tag);
     
-    btn.className = 'font-label-sm shadow-ambient';
+    // Removed shadow-ambient and flat backgrounds for a cleaner blend
+    btn.className = 'font-label-sm';
     btn.textContent = tag;
     btn.style.cssText = `
-      background-color: ${isSelected ? 'var(--primary)' : 'var(--surface-container-highest)'}; 
+      background-color: ${isSelected ? 'var(--primary)' : 'var(--background)'}; 
       color: ${isSelected ? 'var(--on-primary)' : 'var(--on-surface)'}; 
-      border: 1px solid transparent; 
+      border: 1px solid ${isSelected ? 'var(--primary)' : 'var(--outline-variant)'}; 
       border-radius: var(--rounded-full); 
       padding: 10px 16px; 
       cursor: pointer; 
