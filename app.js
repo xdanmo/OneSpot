@@ -49,22 +49,34 @@ const detailContent = document.getElementById('detail-content');
 const btnSheetClose = document.getElementById('btn-sheet-close');
 const btnSheetEdit = document.getElementById('btn-sheet-edit');
 
-// --- Helper: Extract Drive ID ---
+// --- Helper: Extract Drive ID robustly and clean up artificial zeros ---
 function extractDriveId(url) {
   if (!url) return null;
+  let id = null;
+
+  const thumbnailMatch = url.match(/thumbnail\?id=([^&]+)/);
   const ucMatch = url.match(/[?&]id=([^&]+)/);
-  if (ucMatch) return ucMatch[1];
   const lh3Match = url.match(/lh3\.googleusercontent\.com\/d\/([^/?]+)/);
-  if (lh3Match) return lh3Match[1];
-  const oldProfileMatch = url.match(/profile\/picture\/0([^/?]+)/);
-  if (oldProfileMatch) return oldProfileMatch[1];
+  const profileMatch = url.match(/profile\/picture\/([^/?]+)/);
   const driveIdMatch = url.match(/drive_id:(.+)/);
-  if (driveIdMatch) return driveIdMatch[1];
-  if (url.includes('googleusercontent') && url.includes('/0')) {
+
+  if (thumbnailMatch) id = thumbnailMatch[1];
+  else if (ucMatch) id = ucMatch[1];
+  else if (lh3Match) id = lh3Match[1];
+  else if (profileMatch) id = profileMatch[1];
+  else if (driveIdMatch) id = driveIdMatch[1];
+  else if (url.includes('googleusercontent') && url.includes('/0')) {
     const parts = url.split('/0');
-    if (parts.length > 1) return parts[1];
+    if (parts.length > 1) id = parts[1];
   }
-  return null;
+
+  // FIX: Strip the artificial '0' that was prepended in the very first version of the app.
+  // Real Drive IDs are 33 characters. If it's 34 and starts with 0, the 0 is fake.
+  if (id && id.length === 34 && id.startsWith('0')) {
+    id = id.substring(1);
+  }
+
+  return id;
 }
 
 // --- Dynamic Island Toast Notification ---
@@ -290,7 +302,8 @@ async function uploadImageToDrive(file) {
   });
 
   authOverlay.style.display = 'none';
-  return `https://lh3.googleusercontent.com/d/${data.id}`;
+  // Safari friendly stable thumbnail URL
+  return `https://drive.google.com/thumbnail?id=${data.id}&sz=w1000`;
 }
 
 
@@ -478,7 +491,7 @@ function createCardElement(item) {
   itemDiv.className = 'masonry-item';
 
   let driveId = extractDriveId(item.image);
-  let imgSource = driveId ? `https://lh3.googleusercontent.com/d/${driveId}` : item.image;
+  let imgSource = driveId ? `https://drive.google.com/thumbnail?id=${driveId}&sz=w1000` : item.image;
 
   const article = document.createElement('article');
   article.dataset.id = item.id;
@@ -726,7 +739,7 @@ function openDetailSheet(item, preloadedSrc = null) {
     if (!preloadedSrc) {
       driveId = extractDriveId(item.image) || '';
       if (driveId) {
-        sheetImgSource = `https://lh3.googleusercontent.com/d/${driveId}`;
+        sheetImgSource = `https://drive.google.com/thumbnail?id=${driveId}&sz=w1000`;
       }
     } else {
       driveId = extractDriveId(item.image) || '';
@@ -839,7 +852,7 @@ function renderAddPreview() {
     let driveId = extractDriveId(addImageUrl) || '';
     
     if (driveId) {
-      previewSrc = `https://lh3.googleusercontent.com/d/${driveId}`;
+      previewSrc = `https://drive.google.com/thumbnail?id=${driveId}&sz=w1000`;
     }
 
     html = `
