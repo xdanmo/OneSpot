@@ -958,6 +958,7 @@ btnSaveEntry.addEventListener('click', async () => {
   btnSaveEntry.style.pointerEvents = 'none';
 
   let finalImageUrl = addImageUrl;
+  let successMessage = ''; // Added to store the message
 
   try {
     if (pendingImageFile) finalImageUrl = await uploadImageToDrive(pendingImageFile);
@@ -972,7 +973,7 @@ btnSaveEntry.addEventListener('click', async () => {
         entries[index].tags = [...addTags];
         entries[index].type = addTags[0] || 'Note';
       }
-      showToast('Entry updated!');
+      successMessage = 'Entry updated!'; // Store instead of showing
     } else {
       entries.unshift({
         id: Date.now().toString(),
@@ -983,7 +984,7 @@ btnSaveEntry.addEventListener('click', async () => {
         tags: [...addTags],
         type: addTags[0] || 'Note'
       });
-      showToast('Entry saved!');
+      successMessage = 'Entry saved!'; // Store instead of showing
     }
 
     await saveDataToDrive();
@@ -999,6 +1000,8 @@ btnSaveEntry.addEventListener('click', async () => {
     window.location.hash = '#/';
     handleRoute();
     renderFeed();
+    
+    showToast(successMessage); // Show the toast AFTER redirecting and rendering
   } catch (err) {
     showToast('Failed to save. Try again.');
   } finally {
