@@ -13,7 +13,8 @@ let selectedIds = [];
 let isInitialRender = true;
 let lastSelectionTime = 0;
 let searchQuery = ''; 
-let selectedSearchTags = []; // Now supports multiple tag selections
+let tagSearchQuery = ''; 
+let selectedSearchTags = []; 
 let isDetailSheetOpen = false;
 let editingId = null; 
 let currentDetailId = null; 
@@ -25,7 +26,8 @@ const btnLogin = document.getElementById('btn-login');
 const authStatus = document.getElementById('auth-status');
 const feedGrid = document.getElementById('feed-grid');
 const searchTagsContainer = document.getElementById('search-tags-container'); 
-const searchInput = document.getElementById('search-input'); 
+const feedSearchInput = document.getElementById('feed-search-input'); 
+const tagSearchInput = document.getElementById('tag-search-input'); 
 
 const views = {
   '/': document.getElementById('view-home'),
@@ -52,7 +54,6 @@ const btnSheetEdit = document.getElementById('btn-sheet-edit');
 function extractDriveId(url) {
   if (!url) return null;
 
-  // If the string is already just a raw Drive ID (e.g., from DB corruption)
   if (/^[a-zA-Z0-9_-]{28,35}$/.test(url)) {
     let id = url;
     if (id.length === 34 && id.startsWith('0')) return id.substring(1);
@@ -76,7 +77,6 @@ function extractDriveId(url) {
     if (parts.length > 1) id = parts[1];
   }
 
-  // Strip the artificial '0' that was prepended in the very first version
   if (id && id.length === 34 && id.startsWith('0')) {
     id = id.substring(1);
   }
@@ -333,7 +333,6 @@ function handleRoute(noAnimate = false) {
 
   if (hash === '/') {
     if (activeView) activeView.style.display = 'block';
-    // Keeping search state persistent when routing back to home
     renderSearchTags();
     renderSearchFeed(); 
   } else {
@@ -430,8 +429,16 @@ function renderSearchTags() {
   if (!searchTagsContainer) return;
   searchTagsContainer.innerHTML = '';
   
-  // Sort tags so selected ones appear first
-  let sortedTags = [...availableTags].sort((a, b) => {
+  let filteredTags = availableTags;
+  
+  if (tagSearchQuery) {
+    filteredTags = availableTags.filter(tag => tag.toLowerCase().includes(tagSearchQuery));
+  }
+  
+  // Combine to ensure selected tags are always visible even if they don't match the search query
+  const tagsToRender = Array.from(new Set([...filteredTags, ...selectedSearchTags]));
+  
+  let sortedTags = tagsToRender.sort((a, b) => {
     const aSel = selectedSearchTags.includes(a);
     const bSel = selectedSearchTags.includes(b);
     if (aSel && !bSel) return -1;
@@ -462,18 +469,25 @@ function renderSearchTags() {
       } else {
         selectedSearchTags.push(tag);
       }
-      renderSearchTags(); // Re-render to update sorts and active states
-      renderSearchFeed(); // Update the filter feed
+      renderSearchTags(); 
+      renderSearchFeed(); 
     };
     
     searchTagsContainer.appendChild(btn);
   });
 }
 
-if (searchInput) {
-  searchInput.addEventListener('input', (e) => {
+if (feedSearchInput) {
+  feedSearchInput.addEventListener('input', (e) => {
     searchQuery = e.target.value.toLowerCase().trim();
     renderSearchFeed();
+  });
+}
+
+if (tagSearchInput) {
+  tagSearchInput.addEventListener('input', (e) => {
+    tagSearchQuery = e.target.value.toLowerCase().trim();
+    renderSearchTags();
   });
 }
 
@@ -606,7 +620,6 @@ function renderSearchFeed() {
                      (entry.url && entry.url.toLowerCase().includes(query));
     }
     
-    // Strict match: items must have ALL selected tags
     let matchesTag = true;
     if (selectedSearchTags.length > 0) {
       matchesTag = entry.tags && selectedSearchTags.every(t => entry.tags.includes(t));
@@ -787,8 +800,8 @@ function startEditMode(id) {
   btnSaveEntry.textContent = 'Update Entry';
   
   if (isDetailSheetOpen) {
-    closeDetailSheet(true); // Close without popping history stack
-    history.replaceState(null, '', '#/add'); // Replace the modal history state cleanly
+    closeDetailSheet(true); 
+    history.replaceState(null, '', '#/add'); 
     handleRoute();
   } else {
     window.location.hash = '#/add';
