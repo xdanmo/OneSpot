@@ -29,7 +29,6 @@ const searchInput = document.getElementById('search-input');
 
 const views = {
   '/': document.getElementById('view-home'),
-  '/search': document.getElementById('view-home'), 
   '/add': document.getElementById('view-add'),
   '/profile': document.getElementById('view-profile')
 };
@@ -313,7 +312,6 @@ function handleRoute(noAnimate = false) {
   if (typeof noAnimate !== 'boolean') noAnimate = false;
   
   const hash = window.location.hash.replace('#', '') || '/';
-  const searchHeader = document.getElementById('search-header');
 
   if (hash !== '/add' && editingId) {
     editingId = null;
@@ -333,25 +331,11 @@ function handleRoute(noAnimate = false) {
 
   const activeView = views[hash] || views['/'];
 
-  if (hash === '/' || hash === '/search') {
+  if (hash === '/') {
     if (activeView) activeView.style.display = 'block';
-
-    if (hash === '/') {
-      if (searchHeader) {
-        searchHeader.classList.remove('search-header-expanded');
-        searchHeader.classList.add('search-header-collapsed');
-      }
-      searchQuery = '';
-      selectedSearchTag = null;
-      if (searchInput) searchInput.value = '';
-      renderSearchTags();
-      renderSearchFeed(); 
-    } else if (hash === '/search') {
-      if (searchHeader) {
-        searchHeader.classList.remove('search-header-collapsed');
-        searchHeader.classList.add('search-header-expanded');
-      }
-    }
+    // Keeping search state persistent when routing back to home
+    renderSearchTags();
+    renderSearchFeed(); 
   } else {
     if (activeView) {
       activeView.style.display = 'block';
@@ -368,10 +352,9 @@ function handleRoute(noAnimate = false) {
 }
 
 function updateNavIndicator(hash, noAnimate = false) {
-  let activeIndex = 0;
-  if (hash.startsWith('/search')) activeIndex = 1;
-  if (hash.startsWith('/add')) activeIndex = 2;
-  if (hash.startsWith('/profile')) activeIndex = 3;
+  let activeIndex = 0; // Default to Home
+  if (hash.startsWith('/add')) activeIndex = 1;
+  if (hash.startsWith('/profile')) activeIndex = 2;
 
   navLinks.forEach((link, idx) => {
     const icon = link.querySelector('.material-symbols-outlined');
