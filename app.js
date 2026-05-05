@@ -772,13 +772,19 @@ function startEditMode(id) {
 
   btnSaveEntry.textContent = 'Update Entry';
   
-  if (isDetailSheetOpen) closeDetailSheet(false);
+  if (isDetailSheetOpen) {
+    closeDetailSheet(true); // Close the sheet without triggering history.back()
+    history.replaceState(null, '', '#/add'); // Replace the modal's history state with the new route
+    handleRoute();
+  } else {
+    window.location.hash = '#/add';
+  }
+
   if (selectedIds.length > 0) {
     selectedIds = [];
     updateSelectionState(true);
   }
   
-  window.location.hash = '#/add';
   renderAddPreview();
   renderTags();
 }
@@ -812,12 +818,14 @@ function renderAddPreview() {
 
   if (!addImageUrl) {
     html = `
-      <article class="shadow-ambient" style="position: relative; background-color: var(--surface-container-low); color: var(--on-surface); border-radius: var(--rounded-xl); padding: var(--spacing-md); border: 1px solid var(--tertiary-fixed-dim); transform: translateZ(0); -webkit-mask-image: -webkit-radial-gradient(white, black);">
-        <div>
-          <h2 class="font-headline-md" style="line-height: 1.3; word-break: break-word; font-size: clamp(14px, 4.5vw, 24px);">${text}</h2>
-          ${link ? `<a href="https://${link.replace(/^https?:\/\//, '')}" target="_blank" class="font-body-md" style="display: block; margin-top: var(--spacing-sm); color: var(--outline); word-break: break-all; text-decoration: underline; pointer-events: none;">${link}</a>` : ''}
-        </div>
-      </article>
+      <div style="max-width: 240px; margin: 0 auto;">
+        <article class="shadow-ambient" style="position: relative; background-color: var(--surface-container-low); color: var(--on-surface); border-radius: var(--rounded-xl); padding: var(--spacing-md); border: 1px solid var(--tertiary-fixed-dim); transform: translateZ(0); -webkit-mask-image: -webkit-radial-gradient(white, black);">
+          <div>
+            <h2 class="font-headline-md" style="line-height: 1.3; word-break: break-word; font-size: clamp(14px, 4.5vw, 24px);">${text}</h2>
+            ${link ? `<a href="https://${link.replace(/^https?:\/\//, '')}" target="_blank" class="font-body-md" style="display: block; margin-top: var(--spacing-sm); color: var(--outline); word-break: break-all; text-decoration: underline; pointer-events: none;">${link}</a>` : ''}
+          </div>
+        </article>
+      </div>
     `;
   } else {
     let previewSrc = addImageUrl;
@@ -828,17 +836,19 @@ function renderAddPreview() {
     }
 
     html = `
-      <article style="position: relative; background-color: transparent; border-radius: var(--rounded-xl); border: none;">
-        <div class="shadow-ambient" style="position: relative; width: 100%; padding-bottom: ${addImageAspectRatio}; background-color: var(--surface-container-low); overflow: hidden; border-radius: var(--rounded-xl);">
-          <img src="${previewSrc}" data-drive-id="${driveId}" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; border-radius: var(--rounded-xl);" onerror="window.handleImageError(this)" />
-          <div style="position: absolute; bottom: 0; left: 0; width: 100%; padding: 32px 12px 12px; display: flex; flex-direction: column; gap: 6px; z-index: 2;">
-            ${link ? `<div class="font-body-md" style="display: flex; align-items: center; gap: 4px; color: rgba(255,255,255,0.95); font-size: 12px; text-shadow: 0 1px 4px rgba(0,0,0,0.8), 0 0 10px rgba(0,0,0,0.5);"><span class="material-symbols-outlined" style="font-size: 14px;">link</span>${link.replace(/^https?:\/\//, '')}</div>` : ''}
+      <div style="max-width: 240px; margin: 0 auto;">
+        <article style="position: relative; background-color: transparent; border-radius: var(--rounded-xl); border: none;">
+          <div class="shadow-ambient" style="position: relative; width: 100%; padding-bottom: ${addImageAspectRatio}; background-color: var(--surface-container-low); overflow: hidden; border-radius: var(--rounded-xl);">
+            <img src="${previewSrc}" data-drive-id="${driveId}" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; border-radius: var(--rounded-xl);" onerror="window.handleImageError(this)" />
+            <div style="position: absolute; bottom: 0; left: 0; width: 100%; padding: 32px 12px 12px; display: flex; flex-direction: column; gap: 6px; z-index: 2;">
+              ${link ? `<div class="font-body-md" style="display: flex; align-items: center; gap: 4px; color: rgba(255,255,255,0.95); font-size: 12px; text-shadow: 0 1px 4px rgba(0,0,0,0.8), 0 0 10px rgba(0,0,0,0.5);"><span class="material-symbols-outlined" style="font-size: 14px;">link</span>${link.replace(/^https?:\/\//, '')}</div>` : ''}
+            </div>
           </div>
-        </div>
-        <div style="padding: 6px 8px 0; display: flex; flex-direction: column;">
-          <h2 class="font-headline-md" style="color: var(--on-background); display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; font-size: 14px; line-height: 1.2;">${text}</h2>
-        </div>
-      </article>
+          <div style="padding: 6px 8px 0; display: flex; flex-direction: column;">
+            <h2 class="font-headline-md" style="color: var(--on-background); display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; font-size: 14px; line-height: 1.2;">${text}</h2>
+          </div>
+        </article>
+      </div>
     `;
   }
   addPreviewContainer.innerHTML = html;
