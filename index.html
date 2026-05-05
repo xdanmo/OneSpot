@@ -146,7 +146,7 @@
         onmouseover="this.style.opacity='0.9';" onmouseout="this.style.opacity='1';">Save Post</button>
     </main>
 
-    <!-- Selection Bar -->
+    <!-- Post Selection Bar -->
     <div id="selection-bar"
       style="display: none; transform: translateY(200%); transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1); position: fixed; bottom: 32px; left: 0; right: 0; justify-content: center; align-items: center; z-index: 99999;">
       <div class="shadow-nav"
@@ -159,6 +159,26 @@
             style="background-color: var(--error); color: var(--on-error); border: none; border-radius: var(--rounded-full); padding: 8px 16px; cursor: pointer;">Delete</button>
           <div style="width: 1px; height: 24px; background-color: var(--outline-variant);"></div>
           <button id="btn-close-selection"
+            style="display: flex; align-items: center; justify-content: center; background-color: transparent; border: none; color: var(--on-surface-variant); cursor: pointer; padding: 0;">
+            <span class="material-symbols-outlined">close</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tag Selection Bar -->
+    <div id="tag-selection-bar"
+      style="display: none; transform: translateY(200%); transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1); position: fixed; bottom: 32px; left: 0; right: 0; justify-content: center; align-items: center; z-index: 99999;">
+      <div class="shadow-nav"
+        style="position: relative; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 16px; border-radius: var(--rounded-full); min-width: 280px; background-color: rgba(242, 240, 235, 0.95); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.5);">
+        <span class="font-label-md" style="color: var(--on-surface); margin-left: 8px;" id="tag-selection-count">0 Selected</span>
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <button id="btn-edit-tag" class="font-label-sm"
+            style="background-color: var(--surface-container); color: var(--on-surface); border: 1px solid var(--outline-variant); border-radius: var(--rounded-full); padding: 8px 16px; cursor: pointer; display: none;">Edit</button>
+          <button id="btn-delete-tag" class="font-label-sm"
+            style="background-color: var(--error); color: var(--on-error); border: none; border-radius: var(--rounded-full); padding: 8px 16px; cursor: pointer;">Delete</button>
+          <div style="width: 1px; height: 24px; background-color: var(--outline-variant);"></div>
+          <button id="btn-close-tag-selection"
             style="display: flex; align-items: center; justify-content: center; background-color: transparent; border: none; color: var(--on-surface-variant); cursor: pointer; padding: 0;">
             <span class="material-symbols-outlined">close</span>
           </button>
