@@ -648,12 +648,14 @@ function applySelectionStyles() {
   });
 }
 
-function updateSelectionState() {
+function updateSelectionState(instant = false) {
   applySelectionStyles();
 
   if (selectedIds.length > 0) {
+    bottomNav.style.transition = 'transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)';
     bottomNav.style.transform = 'translateY(200%)'; 
     selectionBar.style.display = 'flex';
+    selectionBar.style.transition = 'transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)';
     
     setTimeout(() => {
       selectionBar.style.transform = 'translateY(0)'; 
@@ -662,13 +664,36 @@ function updateSelectionState() {
     selectionCount.textContent = `${selectedIds.length} Selected`;
     if (btnEdit) btnEdit.style.display = selectedIds.length === 1 ? 'block' : 'none';
   } else {
-    selectionBar.style.transform = 'translateY(200%)'; 
-    
-    setTimeout(() => {
+    if (instant) {
+      // Instant hide selection bar, instant show bottom nav
+      selectionBar.style.transition = 'none';
+      selectionBar.style.transform = 'translateY(200%)'; 
       selectionBar.style.display = 'none';
+      
+      bottomNav.style.transition = 'none';
       bottomNav.style.transform = 'translateY(0)'; 
+      
+      // Force layout recalculation so the 'none' transitions apply immediately
+      void bottomNav.offsetWidth;
+      void selectionBar.offsetWidth;
+      
+      // Restore the smooth transitions for future use
+      bottomNav.style.transition = 'transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)';
+      selectionBar.style.transition = 'transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)';
+      
       updateNavIndicator(window.location.hash.replace('#', '') || '/', true);
-    }, 400);
+    } else {
+      // Animated hide/show
+      selectionBar.style.transition = 'transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)';
+      selectionBar.style.transform = 'translateY(200%)'; 
+      
+      setTimeout(() => {
+        selectionBar.style.display = 'none';
+        bottomNav.style.transition = 'transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)';
+        bottomNav.style.transform = 'translateY(0)'; 
+        updateNavIndicator(window.location.hash.replace('#', '') || '/', true);
+      }, 400);
+    }
   }
 }
 
@@ -761,7 +786,7 @@ function startEditMode(id) {
   if (isDetailSheetOpen) closeDetailSheet(false);
   if (selectedIds.length > 0) {
     selectedIds = [];
-    updateSelectionState();
+    updateSelectionState(true); // <--- Instantly replace with nav bar
   }
   
   window.location.hash = '#/add';
@@ -1059,12 +1084,12 @@ btnDelete.addEventListener('click', async () => {
   authOverlay.style.display = 'none';
   showToast(`${count} item(s) deleted`);
   renderFeed();
-  updateSelectionState();
+  updateSelectionState(true); // <--- Instantly replace with nav bar after overlay disappears
 });
 
 btnCloseSelection.addEventListener('click', () => {
   selectedIds = [];
-  updateSelectionState();
+  updateSelectionState(); // <--- Uses default (animated) fallback
 });
 
 document.getElementById('btn-logout').addEventListener('click', () => {
