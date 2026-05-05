@@ -634,7 +634,7 @@ function updateSelectionState() {
   applySelectionStyles();
 
   if (selectedIds.length > 0) {
-    bottomNav.style.transform = 'translateY(150%)'; 
+    bottomNav.style.transform = 'translateY(200%)'; 
     selectionBar.style.display = 'flex';
     
     setTimeout(() => {
@@ -644,13 +644,13 @@ function updateSelectionState() {
     selectionCount.textContent = `${selectedIds.length} Selected`;
     if (btnEdit) btnEdit.style.display = selectedIds.length === 1 ? 'block' : 'none';
   } else {
-    selectionBar.style.transform = 'translateY(150%)'; 
+    selectionBar.style.transform = 'translateY(200%)'; 
     
     setTimeout(() => {
       selectionBar.style.display = 'none';
       bottomNav.style.transform = 'translateY(0)'; 
       updateNavIndicator(window.location.hash.replace('#', '') || '/', true);
-    }, 200);
+    }, 400);
   }
 }
 
