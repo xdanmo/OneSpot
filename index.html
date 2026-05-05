@@ -15,24 +15,22 @@
 <body>
   <div class="app-container">
     
-    <!-- COMBINED HOME & SEARCH VIEW -->
+    <!-- UNIFIED HOME DASHBOARD -->
     <main class="feed-container" id="view-home">
       
-      <!-- GPU-Accelerated Search Wrapper -->
-      <div id="search-header" class="search-header-anim search-header-collapsed">
-        <div class="search-header-inner">
-          <div class="search-content">
-            <div style="max-width: 600px; margin: 0 auto 16px; position: relative;">
-              <span class="material-symbols-outlined" style="position: absolute; left: 16px; top: 50%; transform: translateY(-50%); color: var(--outline-variant); pointer-events: none;">search</span>
-              <input type="text" id="search-input" placeholder="Search by title or link..." class="font-body-md"
-                style="width: 100%; background-color: var(--surface-container-low); border: 1px solid transparent; border-radius: var(--rounded-full); padding: 14px 16px 14px 48px; color: var(--on-surface); outline: none; transition: all 0.2s;"
-                onfocus="this.style.backgroundColor='var(--surface-container)'; this.style.borderColor='var(--outline-variant)';"
-                onblur="this.style.backgroundColor='var(--surface-container-low)'; this.style.borderColor='transparent';" />
-            </div>
-            
-            <!-- Horizontal Scrollable Tags -->
-            <div id="search-tags-container" class="hide-scroll" style="max-width: 600px; margin: 0 auto; display: flex; flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; gap: 8px; justify-content: flex-start; padding-bottom: 8px;">
-            </div>
+      <!-- Persistent Search Header -->
+      <div id="search-header" style="margin-bottom: 8px;">
+        <div class="search-content">
+          <div style="max-width: 600px; margin: 0 auto 16px; position: relative;">
+            <span class="material-symbols-outlined" style="position: absolute; left: 16px; top: 50%; transform: translateY(-50%); color: var(--outline-variant); pointer-events: none;">search</span>
+            <input type="text" id="search-input" placeholder="Search by title or link..." class="font-body-md"
+              style="width: 100%; background-color: var(--surface-container-low); border: 1px solid transparent; border-radius: var(--rounded-full); padding: 14px 16px 14px 48px; color: var(--on-surface); outline: none; transition: all 0.2s;"
+              onfocus="this.style.backgroundColor='var(--surface-container)'; this.style.borderColor='var(--outline-variant)';"
+              onblur="this.style.backgroundColor='var(--surface-container-low)'; this.style.borderColor='transparent';" />
+          </div>
+          
+          <!-- Horizontal Scrollable Tags -->
+          <div id="search-tags-container" class="hide-scroll" style="max-width: 600px; margin: 0 auto; display: flex; flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; gap: 8px; justify-content: flex-start; padding-bottom: 8px;">
           </div>
         </div>
       </div>
@@ -138,11 +136,11 @@
       </div>
     </div>
 
-    <!-- Bottom Nav -->
+    <!-- Bottom Nav (Reduced to 3 Items) -->
     <div id="bottom-nav"
       style="position: fixed; transform: translateY(0); transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1); bottom: 32px; left: 0; right: 0; display: flex; justify-content: center; align-items: center; z-index: 99999;">
       <nav id="nav-container"
-        style="position: relative; display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 12px 16px; border-radius: var(--rounded-full); min-width: 280px; background-color: rgba(242, 240, 235, 0.85); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); border: 1px solid rgba(255, 255, 255, 0.5); overflow: hidden;">
+        style="position: relative; display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 12px 16px; border-radius: var(--rounded-full); min-width: 200px; background-color: rgba(242, 240, 235, 0.85); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); border: 1px solid rgba(255, 255, 255, 0.5); overflow: hidden;">
         
         <!-- Dynamic Island Toast -->
         <div id="nav-toast" class="font-label-sm" style="position: absolute; inset: 0; background-color: transparent; color: var(--on-surface); display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: opacity 0.3s ease; z-index: 10;"></div>
@@ -154,15 +152,11 @@
           style="position: relative; z-index: 1; display: flex; align-items: center; justify-content: center; padding: 16px; border-radius: var(--rounded-full); transition: color 0.5s ease, transform 0.5s ease, opacity 0.3s ease; color: var(--outline);">
           <span class="material-symbols-outlined">home</span>
         </a>
-        <a href="#/search" class="nav-link" data-index="1"
-          style="position: relative; z-index: 1; display: flex; align-items: center; justify-content: center; padding: 16px; border-radius: var(--rounded-full); transition: color 0.5s ease, transform 0.5s ease, opacity 0.3s ease; color: var(--outline);">
-          <span class="material-symbols-outlined">search</span>
-        </a>
-        <a href="#/add" class="nav-link" data-index="2"
+        <a href="#/add" class="nav-link" data-index="1"
           style="position: relative; z-index: 1; display: flex; align-items: center; justify-content: center; padding: 16px; border-radius: var(--rounded-full); transition: color 0.5s ease, transform 0.5s ease, opacity 0.3s ease; color: var(--outline);">
           <span class="material-symbols-outlined">add</span>
         </a>
-        <a href="#/profile" class="nav-link" data-index="3"
+        <a href="#/profile" class="nav-link" data-index="2"
           style="position: relative; z-index: 1; display: flex; align-items: center; justify-content: center; padding: 16px; border-radius: var(--rounded-full); transition: color 0.5s ease, transform 0.5s ease, opacity 0.3s ease; color: var(--outline);">
           <span class="material-symbols-outlined">person</span>
         </a>
