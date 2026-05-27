@@ -331,6 +331,9 @@ function handleRoute(noAnimate = false) {
     editingId = null;
     btnSaveEntry.textContent = 'Save Post';
     addText.value = ''; addLink.value = ''; addImage.value = ''; addImageUrl = ''; addTags = [];
+    addAnchor.value = '';
+    btnShowAnchor.style.display = 'flex';
+    anchorContainer.style.display = 'none';
     renderAddPreview(); renderTags();
   }
 
@@ -522,6 +525,8 @@ function createCardElement(item) {
   article.className = 'card-hover';
   article.style.cssText = 'display:block;width:100%;cursor:pointer;border-radius:var(--rounded-xl);transform:scale(1);opacity:1;transition:transform 0.3s cubic-bezier(0.34,1.56,0.64,1),opacity 0.3s;position:relative;';
 
+  const displayLinkText = item.anchorText || item.url;
+
   if (!item.image) {
     article.classList.add('shadow-ambient');
     article.style.backgroundColor = 'var(--surface-container-low)';
@@ -531,7 +536,7 @@ function createCardElement(item) {
     article.innerHTML = `
       <div style="display:flex;flex-direction:column;gap:var(--spacing-md);">
         <h2 class="font-headline-md" style="line-height:1.3;word-break:break-word;font-size:clamp(14px,4.5vw,24px);">${item.title}</h2>
-        ${item.url ? `<a href="https://${item.url.replace(/^https?:\/\//, '')}" target="_blank" class="font-body-md" style="display:block;margin-top:var(--spacing-sm);color:var(--outline);text-decoration:underline;">${item.url}</a>` : ''}
+        ${item.url ? `<a href="https://${item.url.replace(/^https?:\/\//, '')}" target="_blank" class="font-body-md" style="display:block;margin-top:var(--spacing-sm);color:var(--outline);text-decoration:underline;">${displayLinkText}</a>` : ''}
       </div>`;
   } else {
     article.style.backgroundColor = 'transparent';
@@ -541,7 +546,7 @@ function createCardElement(item) {
         <img src="${imgSource}" data-drive-id="${driveId || ''}" alt="" class="img-hover" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover; pointer-events:none;"
           onerror="window.handleImageError(this)" />
         <div style="position:absolute;bottom:0;left:0;width:100%;padding:32px 12px 12px;display:flex;flex-direction:column;gap:6px;z-index:2;pointer-events:none;">
-          ${item.url ? `<a href="https://${item.url.replace(/^https?:\/\//, '')}" target="_blank" style="display:flex;align-items:center;gap:4px;color:rgba(255,255,255,0.95);text-decoration:none;font-size:12px;text-shadow:0 1px 4px rgba(0,0,0,0.8), 0 0 10px rgba(0,0,0,0.5);"><span class="material-symbols-outlined" style="font-size:14px;">link</span>${item.url}</a>` : ''}
+          ${item.url ? `<a href="https://${item.url.replace(/^https?:\/\//, '')}" target="_blank" style="display:flex;align-items:center;gap:4px;color:rgba(255,255,255,0.95);text-decoration:none;font-size:12px;text-shadow:0 1px 4px rgba(0,0,0,0.8), 0 0 10px rgba(0,0,0,0.5);"><span class="material-symbols-outlined" style="font-size:14px;">link</span>${displayLinkText}</a>` : ''}
         </div>
       </div>
       <div style="padding:6px 8px 0;">
@@ -636,7 +641,8 @@ function renderSearchFeed() {
     let matchesQuery = true;
     if (query) {
       matchesQuery = (entry.title && entry.title.toLowerCase().includes(query)) || 
-                     (entry.url && entry.url.toLowerCase().includes(query));
+                     (entry.url && entry.url.toLowerCase().includes(query)) ||
+                     (entry.anchorText && entry.anchorText.toLowerCase().includes(query));
     }
     
     let matchesTag = true;
@@ -825,11 +831,13 @@ function openDetailSheet(item, preloadedSrc = null) {
       </div>
     `;
   }
+  
+  const displayLinkText = item.anchorText || item.url;
 
   detailContent.innerHTML = `
     ${imgHtml}
     <h1 style="font-family: var(--font-family); font-size: 22px; font-weight: 600; line-height: 1.3; color: var(--on-surface); margin-bottom: 12px; word-break: break-word;">${item.title}</h1>
-    ${item.url ? `<a href="https://${item.url.replace(/^https?:\/\//, '')}" target="_blank" style="display: inline-flex; align-items: center; gap: 6px; color: var(--outline); text-decoration: none; font-size: 14px; margin-bottom: 20px;"><span class="material-symbols-outlined" style="font-size: 16px;">open_in_new</span>${item.url}</a>` : ''}
+    ${item.url ? `<a href="https://${item.url.replace(/^https?:\/\//, '')}" target="_blank" style="display: inline-flex; align-items: center; gap: 6px; color: var(--outline); text-decoration: none; font-size: 14px; margin-bottom: 20px;"><span class="material-symbols-outlined" style="font-size: 16px;">open_in_new</span>${displayLinkText}</a>` : ''}
     ${item.tags ? `<div style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px;">${item.tags.map(tag => `<span class="font-label-sm" style="background-color: var(--surface-container-high); color: var(--on-surface-variant); padding: 6px 14px; border-radius: 9999px; font-size: 13px;">${tag}</span>`).join('')}</div>` : ''}
   `;
 
@@ -899,9 +907,18 @@ function startEditMode(id) {
   editingId = id;
   addText.value = entry.title || '';
   addLink.value = entry.url || '';
+  addAnchor.value = entry.anchorText || '';
   addImageUrl = entry.image || '';
   addImageAspectRatio = entry.aspectRatio || '100%';
   addTags = entry.tags ? [...entry.tags] : [];
+  
+  if (entry.anchorText) {
+    btnShowAnchor.style.display = 'none';
+    anchorContainer.style.display = 'block';
+  } else {
+    btnShowAnchor.style.display = 'flex';
+    anchorContainer.style.display = 'none';
+  }
   
   pendingImageFile = null;
   addImage.value = ''; 
@@ -941,15 +958,27 @@ let pendingImageFile = null;
 
 const addText = document.getElementById('add-text');
 const addLink = document.getElementById('add-link');
+const addAnchor = document.getElementById('add-anchor');
+const btnShowAnchor = document.getElementById('btn-show-anchor');
+const anchorContainer = document.getElementById('anchor-container');
 const addImage = document.getElementById('add-image');
 const addImageFile = document.getElementById('add-image-file');
 const addPreviewContainer = document.getElementById('add-preview-container');
 const tagsContainer = document.getElementById('tags-container');
 const btnSaveEntry = document.getElementById('btn-save-entry');
 
+if (btnShowAnchor) {
+  btnShowAnchor.addEventListener('click', () => {
+    btnShowAnchor.style.display = 'none';
+    anchorContainer.style.display = 'block';
+    addAnchor.focus();
+  });
+}
+
 function renderAddPreview() {
   const text = addText.value || (editingId ? 'Edit Preview' : 'Preview');
   const link = addLink.value;
+  const displayLinkText = addAnchor.value.trim() || link;
   let html = '';
 
   if (!addImageUrl) {
@@ -958,7 +987,7 @@ function renderAddPreview() {
         <article class="shadow-ambient" style="position: relative; background-color: var(--surface-container-low); color: var(--on-surface); border-radius: var(--rounded-xl); padding: var(--spacing-md); border: 1px solid var(--tertiary-fixed-dim); transform: translateZ(0); -webkit-mask-image: -webkit-radial-gradient(white, black);">
           <div>
             <h2 class="font-headline-md" style="line-height: 1.3; word-break: break-word; font-size: clamp(14px, 4.5vw, 24px);">${text}</h2>
-            ${link ? `<a href="https://${link.replace(/^https?:\/\//, '')}" target="_blank" class="font-body-md" style="display: block; margin-top: var(--spacing-sm); color: var(--outline); word-break: break-all; text-decoration: underline; pointer-events: none;">${link}</a>` : ''}
+            ${link ? `<a href="https://${link.replace(/^https?:\/\//, '')}" target="_blank" class="font-body-md" style="display: block; margin-top: var(--spacing-sm); color: var(--outline); word-break: break-all; text-decoration: underline; pointer-events: none;">${displayLinkText}</a>` : ''}
           </div>
         </article>
       </div>
@@ -977,7 +1006,7 @@ function renderAddPreview() {
           <div class="shadow-ambient" style="position: relative; width: 100%; padding-bottom: ${addImageAspectRatio}; background-color: var(--surface-container-low); overflow: hidden; border-radius: var(--rounded-xl);">
             <img src="${previewSrc}" data-drive-id="${driveId}" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; border-radius: var(--rounded-xl);" onerror="window.handleImageError(this)" />
             <div style="position: absolute; bottom: 0; left: 0; width: 100%; padding: 32px 12px 12px; display: flex; flex-direction: column; gap: 6px; z-index: 2;">
-              ${link ? `<div class="font-body-md" style="display: flex; align-items: center; gap: 4px; color: rgba(255,255,255,0.95); font-size: 12px; text-shadow: 0 1px 4px rgba(0,0,0,0.8), 0 0 10px rgba(0,0,0,0.5);"><span class="material-symbols-outlined" style="font-size: 14px;">link</span>${link.replace(/^https?:\/\//, '')}</div>` : ''}
+              ${link ? `<div class="font-body-md" style="display: flex; align-items: center; gap: 4px; color: rgba(255,255,255,0.95); font-size: 12px; text-shadow: 0 1px 4px rgba(0,0,0,0.8), 0 0 10px rgba(0,0,0,0.5);"><span class="material-symbols-outlined" style="font-size: 14px;">link</span>${displayLinkText.replace(/^https?:\/\//, '')}</div>` : ''}
             </div>
           </div>
           <div style="padding: 6px 8px 0; display: flex; flex-direction: column;">
@@ -1122,6 +1151,7 @@ function renderTags() {
 
 addText.addEventListener('input', renderAddPreview);
 addLink.addEventListener('input', renderAddPreview);
+if (addAnchor) addAnchor.addEventListener('input', renderAddPreview);
 
 addImage.addEventListener('input', (e) => {
   addImageUrl = e.target.value;
@@ -1175,6 +1205,7 @@ btnSaveEntry.addEventListener('click', async () => {
       if (index !== -1) {
         entries[index].title = addText.value;
         entries[index].url = addLink.value;
+        entries[index].anchorText = addAnchor.value.trim();
         entries[index].image = finalImageUrl;
         entries[index].aspectRatio = addImageAspectRatio;
         entries[index].tags = [...addTags];
@@ -1186,6 +1217,7 @@ btnSaveEntry.addEventListener('click', async () => {
         id: Date.now().toString(),
         title: addText.value,
         url: addLink.value,
+        anchorText: addAnchor.value.trim(),
         image: finalImageUrl,
         aspectRatio: addImageAspectRatio,
         tags: [...addTags],
@@ -1197,6 +1229,7 @@ btnSaveEntry.addEventListener('click', async () => {
     await saveDataToDrive();
 
     addText.value = ''; addLink.value = ''; addImage.value = ''; addImageUrl = ''; 
+    addAnchor.value = ''; btnShowAnchor.style.display = 'flex'; anchorContainer.style.display = 'none';
     pendingImageFile = null; addTags = []; editingId = null;
     btnSaveEntry.textContent = 'Save Post';
     
