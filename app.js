@@ -535,7 +535,7 @@ function createCardElement(item) {
     article.style.border = '1px solid var(--tertiary-fixed-dim)';
     article.innerHTML = `
       <div style="display:flex;flex-direction:column;gap:var(--spacing-md);">
-        <h2 class="font-headline-md" style="line-height:1.3;word-break:break-word;font-size:clamp(14px,4.5vw,24px);">${item.title}</h2>
+        <h2 class="font-headline-md" style="line-height:1.3;word-break:break-word;white-space:pre-wrap;font-size:clamp(14px,4.5vw,24px);">${item.title}</h2>
         ${item.url ? `<a href="https://${item.url.replace(/^https?:\/\//, '')}" target="_blank" class="font-body-md" style="display:block;margin-top:var(--spacing-sm);color:var(--outline);text-decoration:underline;">${displayLinkText}</a>` : ''}
       </div>`;
   } else {
@@ -550,7 +550,7 @@ function createCardElement(item) {
         </div>
       </div>
       <div style="padding:6px 8px 0;">
-        <h2 class="font-headline-md" style="color:var(--on-background);display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden;font-size:14px;line-height:1.2;">${item.title}</h2>
+        <h2 class="font-headline-md" style="color:var(--on-background);display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden;font-size:14px;line-height:1.2;white-space:pre-wrap;">${item.title}</h2>
       </div>`;
   }
 
@@ -836,7 +836,7 @@ function openDetailSheet(item, preloadedSrc = null) {
 
   detailContent.innerHTML = `
     ${imgHtml}
-    <h1 style="font-family: var(--font-family); font-size: 22px; font-weight: 600; line-height: 1.3; color: var(--on-surface); margin-bottom: 12px; word-break: break-word;">${item.title}</h1>
+    <h1 style="font-family: var(--font-family); font-size: 22px; font-weight: 600; line-height: 1.3; color: var(--on-surface); margin-bottom: 12px; word-break: break-word; white-space: pre-wrap;">${item.title}</h1>
     ${item.url ? `<a href="https://${item.url.replace(/^https?:\/\//, '')}" target="_blank" style="display: inline-flex; align-items: center; gap: 6px; color: var(--outline); text-decoration: none; font-size: 14px; margin-bottom: 20px;"><span class="material-symbols-outlined" style="font-size: 16px;">open_in_new</span>${displayLinkText}</a>` : ''}
     ${item.tags ? `<div style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px;">${item.tags.map(tag => `<span class="font-label-sm" style="background-color: var(--surface-container-high); color: var(--on-surface-variant); padding: 6px 14px; border-radius: 9999px; font-size: 13px;">${tag}</span>`).join('')}</div>` : ''}
   `;
@@ -986,7 +986,7 @@ function renderAddPreview() {
       <div style="max-width: 240px; margin: 0 auto;">
         <article class="shadow-ambient" style="position: relative; background-color: var(--surface-container-low); color: var(--on-surface); border-radius: var(--rounded-xl); padding: var(--spacing-md); border: 1px solid var(--tertiary-fixed-dim); transform: translateZ(0); -webkit-mask-image: -webkit-radial-gradient(white, black);">
           <div>
-            <h2 class="font-headline-md" style="line-height: 1.3; word-break: break-word; font-size: clamp(14px, 4.5vw, 24px);">${text}</h2>
+            <h2 class="font-headline-md" style="line-height: 1.3; word-break: break-word; white-space: pre-wrap; font-size: clamp(14px, 4.5vw, 24px);">${text}</h2>
             ${link ? `<a href="https://${link.replace(/^https?:\/\//, '')}" target="_blank" class="font-body-md" style="display: block; margin-top: var(--spacing-sm); color: var(--outline); word-break: break-all; text-decoration: underline; pointer-events: none;">${displayLinkText}</a>` : ''}
           </div>
         </article>
@@ -1010,7 +1010,7 @@ function renderAddPreview() {
             </div>
           </div>
           <div style="padding: 6px 8px 0; display: flex; flex-direction: column;">
-            <h2 class="font-headline-md" style="color: var(--on-background); display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; font-size: 14px; line-height: 1.2;">${text}</h2>
+            <h2 class="font-headline-md" style="color: var(--on-background); display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; font-size: 14px; line-height: 1.2; white-space: pre-wrap;">${text}</h2>
           </div>
         </article>
       </div>
