@@ -11,7 +11,6 @@
   <link rel="apple-touch-icon" href="icon-192.png">
   <link rel="stylesheet" href="style.css">
   <style>
-    /* Aggressively hide scrollbars to prevent track strips */
     .hide-scroll::-webkit-scrollbar {
       display: none !important;
       width: 0 !important;
@@ -81,7 +80,7 @@
           style="background-color: var(--surface-container-highest); color: var(--error); border: 1px solid var(--error); border-radius: var(--rounded-full); padding: 12px 24px; margin-top: 16px; cursor: pointer; transition: all 0.2s;"
           onmouseover="this.style.backgroundColor='var(--error)'; this.style.color='var(--on-error)';"
           onmouseout="this.style.backgroundColor='var(--surface-container-highest)'; this.style.color='var(--error)';">Disconnect
-          Drive</button>
+          Dropbox</button>
       </div>
     </main>
     
@@ -92,11 +91,14 @@
 
       <div class="shadow-ambient" style="background-color: var(--surface-container-low); border-radius: var(--rounded-xl); padding: var(--spacing-md); display: flex; flex-direction: column; gap: 16px; border: 1px solid var(--tertiary-fixed-dim);">
         
-        <div style="position: relative;">
-          <textarea id="add-text" placeholder="Write your thoughts..." class="font-body-md"
+        <div style="position: relative; display: flex; flex-direction: column; gap: 12px;">
+          <input type="text" id="add-title" placeholder="Post Title (max 100 chars)" maxlength="100" class="font-body-md"
+            style="width: 100%; background-color: var(--surface-container-highest); border: 1px solid transparent; border-radius: var(--rounded-lg); padding: 16px; color: var(--on-surface); outline: none; transition: all 0.2s;"
+            onfocus="this.style.borderColor='var(--primary)';" onblur="this.style.borderColor='transparent';" />
+            
+          <textarea id="add-description" placeholder="Description (optional)..." class="font-body-md"
             style="width: 100%; min-height: 100px; background-color: var(--surface-container-highest); border: 1px solid transparent; border-radius: var(--rounded-lg); padding: 16px; color: var(--on-surface); outline: none; transition: all 0.2s; resize: vertical;"
-            onfocus="this.style.borderColor='var(--primary)';"
-            onblur="this.style.borderColor='transparent';"></textarea>
+            onfocus="this.style.borderColor='var(--primary)';" onblur="this.style.borderColor='transparent';"></textarea>
         </div>
 
         <div style="display: flex; gap: 12px; width: 100%;">
@@ -267,7 +269,7 @@
         your drive.</p>
       <button id="btn-login" class="font-label-sm shadow-ambient"
         style="background-color: var(--primary); color: var(--on-primary); border-radius: var(--rounded-full); padding: 16px 32px; cursor: pointer; transition: opacity 0.2s; display: none;">Connect
-        Google Drive</button>
+        Dropbox</button>
       <p id="auth-status" class="font-label-sm"
         style="margin-top: var(--spacing-md); color: var(--on-surface-variant);">Initializing...</p>
         
@@ -275,8 +277,8 @@
     </div>
   </div>
 
-  <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <script src="https://apis.google.com/js/api.js" async defer></script>
+  <!-- Use the official Dropbox SDK from jsDelivr -->
+  <script src="https://cdn.jsdelivr.net/npm/dropbox@10.34.0/dist/Dropbox-sdk.min.js"></script>
   <script src="app.js" type="module"></script>
 </body>
 
