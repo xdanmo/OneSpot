@@ -1,12 +1,22 @@
-const CLIENT_ID = '1057081070342-4feaisjviq7n4skffb7upg3us7bigjkf.apps.googleusercontent.com';
-const DISCOVERY_DOCS = ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest'];
-const SCOPES = 'https://www.googleapis.com/auth/drive.file';
+const CLIENT_ID = '6sxijlqtwr8h6zk'; // Replace with your App Key. NEVER put your App Secret here.
 
-let tokenClient;
-let gapiInited = false;
-let gisInited = false;
-let folderId = null;
-let dataFileId = null;
+// --- Auth URL Normalization ---
+// Fixes the "index.html" vs "/" mismatch problem for Dropbox Console.
+// It forces the app to always use the clean, root directory URL.
+let cleanPath = window.location.pathname;
+if (cleanPath.endsWith('index.html')) {
+    cleanPath = cleanPath.replace('index.html', '');
+    // Instantly clean up the browser's address bar to match
+    window.history.replaceState({}, document.title, window.location.origin + cleanPath + window.location.hash);
+}
+const REDIRECT_URI = window.location.origin + cleanPath;
+
+// --- Auth debugging ---
+console.log('[OneSpot Auth Debug] Normalized REDIRECT_URI:', REDIRECT_URI);
+
+let dbxAuth = null;
+let dbx = null;
+let dataFileRev = null; 
 
 let entries = [];
 let selectedIds = [];
@@ -64,41 +74,7 @@ const tagEditInput = document.getElementById('tag-edit-input');
 const btnTagEditCancel = document.getElementById('btn-tag-edit-cancel');
 const btnTagEditSave = document.getElementById('btn-tag-edit-save');
 
-// --- Helper: Extract Drive ID robustly and clean up artificial zeros ---
-function extractDriveId(url) {
-  if (!url) return null;
 
-  if (/^[a-zA-Z0-9_-]{28,35}$/.test(url)) {
-    let id = url;
-    if (id.length === 34 && id.startsWith('0')) return id.substring(1);
-    return id;
-  }
-
-  let id = null;
-  const thumbnailMatch = url.match(/thumbnail\?id=([^&]+)/);
-  const ucMatch = url.match(/[?&]id=([^&]+)/);
-  const lh3Match = url.match(/lh3\.googleusercontent\.com\/d\/([^/?]+)/);
-  const profileMatch = url.match(/profile\/picture\/(?:0)?([^/?]+)/); 
-  const driveIdMatch = url.match(/drive_id:(.+)/);
-
-  if (thumbnailMatch) id = thumbnailMatch[1];
-  else if (ucMatch) id = ucMatch[1];
-  else if (lh3Match) id = lh3Match[1];
-  else if (profileMatch) id = profileMatch[1];
-  else if (driveIdMatch) id = driveIdMatch[1];
-  else if (url.includes('googleusercontent') && url.includes('/0')) {
-    const parts = url.split('/0');
-    if (parts.length > 1) id = parts[1];
-  }
-
-  if (id && id.length === 34 && id.startsWith('0')) {
-    id = id.substring(1);
-  }
-
-  return id;
-}
-
-// --- Dynamic Island Toast Notification ---
 function showToast(message) {
   const navToast = document.getElementById('nav-toast');
   const navIndicator = document.getElementById('nav-indicator');
@@ -119,166 +95,141 @@ function showToast(message) {
   }, 3000);
 }
 
-// --- Global Error Handler for Images ---
-window.handleImageError = async function(img) {
-  if (img.dataset.retried === '1') return;
-  img.dataset.retried = '1';
-
-  const driveId = img.dataset.driveId;
-
-  if (!driveId || driveId.includes('{data.id}')) {
-    img.style.display = 'none'; 
+// --- Dropbox Initialization & PKCE Auth ---
+window.onload = async function () {
+  // Dropbox OAuth requires a real http(s) origin. Opening this file directly
+  // (double-clicking index.html, file://...) produces an invalid redirect_uri
+  // and Dropbox will reject login with a generic "bad request" error.
+  if (window.location.protocol === 'file:') {
+    console.error('[OneSpot Auth Debug] Blocked: page loaded via file:// — Dropbox OAuth cannot work here. Serve this folder through a local server (e.g. "npx serve" or VS Code Live Server) or deploy it, then reload.');
+    authStatus.style.display = 'block';
+    authStatus.textContent = 'This app needs to be served over http/https, not opened directly as a file. Run it through a local server or deploy it, then reload this page.';
+    btnLogin.style.display = 'none';
+    authOverlay.style.display = 'flex';
     return;
   }
 
-  try {
-    const token = gapi.client.getToken();
-    if (!token || !token.access_token) throw new Error("No token");
-
-    const res = await fetch(`https://www.googleapis.com/drive/v3/files/${driveId}?alt=media`, {
-      headers: { 'Authorization': 'Bearer ' + token.access_token }
-    });
-
-    if (!res.ok) throw new Error('Fetch failed');
-
-    const blob = await res.blob();
-    img.src = URL.createObjectURL(blob);
-    img.style.display = 'block';
-  } catch (e) {
-    img.style.display = 'none';
-  }
-};
-
-// --- Google Drive Initialization ---
-window.onload = function () {
-  gapi.load('client', initGoogleDriveClient);
-  tokenClient = google.accounts.oauth2.initTokenClient({
-    client_id: CLIENT_ID,
-    scope: SCOPES,
-    callback: async (response) => {
-      if (response.error !== undefined) throw (response);
-      const tokenInfo = Object.assign({}, response, {
-        expires_at: Date.now() + (response.expires_in * 1000)
-      });
-      localStorage.setItem('onespot_token', JSON.stringify(tokenInfo));
-      authOverlay.style.display = 'none';
-      await initializeDrive();
-    },
+  dbxAuth = new Dropbox.DropboxAuth({
+    clientId: CLIENT_ID,
   });
-  gisInited = true;
-  maybeEnableButtons();
+
+  const urlParams = new URLSearchParams(window.location.search);
+  const code = urlParams.get('code');
+
+  if (code) {
+    authOverlay.style.display = 'flex';
+    authStatus.style.display = 'block';
+    authStatus.textContent = 'Completing login...';
+    btnLogin.style.display = 'none';
+
+    try {
+      const codeVerifier = window.sessionStorage.getItem('codeVerifier');
+      dbxAuth.setCodeVerifier(codeVerifier);
+      
+      const response = await dbxAuth.getAccessTokenFromCode(REDIRECT_URI, code);
+      dbxAuth.setAccessToken(response.result.access_token);
+      dbxAuth.setRefreshToken(response.result.refresh_token);
+      
+      // Save refresh token securely in localStorage for persistent sessions
+      localStorage.setItem('onespot_dbx_refresh', response.result.refresh_token);
+      
+      // Clean up URL
+      window.history.replaceState({}, document.title, window.location.pathname + window.location.hash);
+      
+      dbx = new Dropbox.Dropbox({ auth: dbxAuth });
+      await initializeDropbox();
+    } catch (error) {
+      console.error('Auth error:', error);
+      const detail = (error && error.error && error.error.error_summary) || (error && error.message) || '';
+      console.error('[OneSpot Auth Debug] Failure detail:', detail || '(no extra detail returned)');
+      showToast(detail ? `Login failed: ${detail}` : 'Login failed. Please try again.');
+      resetAuthUI();
+    }
+  } else {
+    // Check if we have a saved refresh token
+    const savedRefreshToken = localStorage.getItem('onespot_dbx_refresh');
+    if (savedRefreshToken) {
+      dbxAuth.setRefreshToken(savedRefreshToken);
+      dbx = new Dropbox.Dropbox({ auth: dbxAuth });
+      await initializeDropbox();
+    } else {
+      resetAuthUI();
+    }
+  }
 
   setTimeout(() => handleRoute(true), 150);
   setTimeout(() => handleRoute(true), 500); 
 };
 
-async function initGoogleDriveClient() {
-  await gapi.client.init({ discoveryDocs: DISCOVERY_DOCS });
-  gapiInited = true;
-  maybeEnableButtons();
+function resetAuthUI() {
+  authStatus.style.display = 'none';
+  btnLogin.style.display = 'block';
+  authOverlay.style.display = 'flex';
 }
 
-function maybeEnableButtons() {
-  if (gapiInited && gisInited) {
-    const saved = localStorage.getItem('onespot_token');
-    if (saved) {
-      try {
-        const tokenInfo = JSON.parse(saved);
-        
-        if (Date.now() > tokenInfo.expires_at) {
-           console.log("Token expired, requiring manual re-auth.");
-           localStorage.removeItem('onespot_token');
-           authStatus.style.display = 'none';
-           btnLogin.style.display = 'block';
-           return;
-        }
-        
-        gapi.client.setToken(tokenInfo);
-        initializeDrive();
-        return;
-      } catch (e) {
-        localStorage.removeItem('onespot_token');
-      }
-    }
-    authStatus.style.display = 'none';
-    btnLogin.style.display = 'block';
+btnLogin.onclick = async () => {
+  try {
+    const authUrl = await dbxAuth.getAuthenticationUrl(REDIRECT_URI, undefined, 'code', 'offline', undefined, undefined, true);
+    window.sessionStorage.setItem('codeVerifier', dbxAuth.getCodeVerifier());
+    console.log('[OneSpot Auth Debug] Navigating to Dropbox authorize URL:', authUrl);
+    window.location.href = authUrl;
+  } catch (error) {
+    console.error('Error generating auth URL:', error);
+    showToast('Failed to start login process.');
   }
-}
-
-btnLogin.onclick = () => {
-  tokenClient.requestAccessToken({ prompt: 'consent' });
 };
 
-async function initializeDrive() {
+async function initializeDropbox() {
   authStatus.style.display = 'block';
-  authStatus.textContent = 'Syncing with Drive...';
+  authStatus.textContent = 'Syncing with Dropbox...';
   btnLogin.style.display = 'none';
   authOverlay.style.display = 'flex';
 
   try {
-    let q = "name='OneSpot' and mimeType='application/vnd.google-apps.folder' and trashed=false";
-    let res = await gapi.client.drive.files.list({ q: q, spaces: 'drive' });
-    if (res.result.files.length > 0) {
-      folderId = res.result.files[0].id;
-    } else {
-      res = await gapi.client.drive.files.create({
-        resource: { name: 'OneSpot', mimeType: 'application/vnd.google-apps.folder' },
-        fields: 'id'
-      });
-      folderId = res.result.id;
-    }
-
-    q = `name='data.json' and '${folderId}' in parents and trashed=false`;
-    res = await gapi.client.drive.files.list({ q: q, spaces: 'drive' });
-    if (res.result.files.length > 0) {
-      dataFileId = res.result.files[0].id;
-      const fileRes = await gapi.client.drive.files.get({ fileId: dataFileId, alt: 'media' });
+    // Attempt to download the data.json file from the root of the App Folder
+    try {
+      const response = await dbx.filesDownload({ path: '/data.json' });
+      dataFileRev = response.result.rev;
       
-      if (fileRes.result && typeof fileRes.result === 'object') {
-        entries = Array.isArray(fileRes.result) ? fileRes.result : [];
-      } else if (fileRes.body) {
-        try { entries = JSON.parse(fileRes.body); } catch (e) { entries = []; }
+      const text = await response.result.fileBlob.text();
+      entries = JSON.parse(text);
+      if (!Array.isArray(entries)) entries = [];
+      
+    } catch (err) {
+      if (err.status === 409 && err.error && err.error.error_summary.includes('not_found')) {
+        // File doesn't exist, create an empty one
+        entries = [];
+        const fileContent = new Blob(['[]'], { type: 'application/json' });
+        const uploadRes = await dbx.filesUpload({
+            path: '/data.json',
+            contents: fileContent,
+            mode: {'.tag': 'add'}
+        });
+        dataFileRev = uploadRes.result.rev;
+      } else {
+         throw err;
       }
-    } else {
-      const file = new Blob(['[]'], { type: 'application/json' });
-      const metadata = { name: 'data.json', parents: [folderId] };
-      const form = new FormData();
-      form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
-      form.append('file', file);
-
-      const createRes = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
-        method: 'POST',
-        headers: { 'Authorization': 'Bearer ' + gapi.client.getToken().access_token },
-        body: form
-      });
-      const data = await createRes.json();
-      dataFileId = data.id;
     }
 
-    const aboutRes = await gapi.client.drive.about.get({ fields: 'user' });
-    if (aboutRes.result.user) {
-      const user = aboutRes.result.user;
-      document.getElementById('profile-name').textContent = user.displayName || 'User';
-      document.getElementById('profile-email').textContent = user.emailAddress || '';
-      if (user.photoLink) {
-        let photoUrl = user.photoLink;
-        if (photoUrl.startsWith('//')) photoUrl = 'https:' + photoUrl;
-        const img = document.getElementById('profile-image');
-        img.src = photoUrl;
-        img.style.display = 'block';
-        document.getElementById('profile-placeholder').style.display = 'none';
-      }
+    const accountRes = await dbx.usersGetCurrentAccount();
+    const user = accountRes.result;
+    document.getElementById('profile-name').textContent = user.name.display_name || 'User';
+    document.getElementById('profile-email').textContent = user.email || '';
+    if (user.profile_photo_url) {
+      const img = document.getElementById('profile-image');
+      img.src = user.profile_photo_url;
+      img.style.display = 'block';
+      document.getElementById('profile-placeholder').style.display = 'none';
     }
 
   } catch (err) {
-    console.error('Drive API Error:', err);
-    if (err.status === 401 || (err.result && err.result.error && err.result.error.code === 401)) {
-      localStorage.removeItem('onespot_token');
-      authStatus.style.display = 'none';
-      btnLogin.style.display = 'block';
+    console.error('Dropbox API Error:', err);
+    if (err.status === 401) {
+      localStorage.removeItem('onespot_dbx_refresh');
+      resetAuthUI();
       return;
     } else {
-      showToast('Failed to connect to Drive. Please try again.');
+      showToast('Failed to connect to Dropbox. Please try again.');
     }
   }
 
@@ -286,39 +237,61 @@ async function initializeDrive() {
   renderFeed();
 }
 
-async function saveDataToDrive() {
-  const file = new Blob([JSON.stringify(entries, null, 2)], { type: 'application/json' });
-  await fetch(`https://www.googleapis.com/upload/drive/v3/files/${dataFileId}?uploadType=media`, {
-    method: 'PATCH',
-    headers: { 'Authorization': 'Bearer ' + gapi.client.getToken().access_token },
-    body: file
-  });
+async function saveDataToDropbox() {
+  const fileContent = new Blob([JSON.stringify(entries, null, 2)], { type: 'application/json' });
+  try {
+      const response = await dbx.filesUpload({
+        path: '/data.json',
+        contents: fileContent,
+        mode: {'.tag': 'overwrite'}
+      });
+      dataFileRev = response.result.rev;
+  } catch(e) {
+      console.error("Failed to save data.json", e);
+      showToast('Failed to save data.');
+      throw e;
+  }
 }
 
-async function uploadImageToDrive(file) {
+async function uploadImageToDropbox(file) {
   authOverlay.style.display = 'flex';
   authStatus.textContent = 'Uploading image...';
   authStatus.style.display = 'block';
 
-  const metadata = { name: file.name, parents: [folderId] };
-  const form = new FormData();
-  form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
-  form.append('file', file);
+  // Generate a unique filename to prevent collisions in the App Folder
+  const ext = file.name.split('.').pop();
+  const filename = `/images/${Date.now()}_${Math.random().toString(36).substring(7)}.${ext}`;
+  let response;
 
-  const createRes = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id', {
-    method: 'POST',
-    headers: { 'Authorization': 'Bearer ' + gapi.client.getToken().access_token },
-    body: form
-  });
-  const data = await createRes.json();
-
-  await gapi.client.drive.permissions.create({
-    fileId: data.id,
-    resource: { type: 'anyone', role: 'reader' }
-  });
-
-  authOverlay.style.display = 'none';
-  return `https://drive.google.com/thumbnail?id=${data.id}&sz=w1000`;
+  try {
+    // Convert File object to ArrayBuffer to prevent browser serialization bugs that cause 400 Bad Request
+    const fileBuffer = await file.arrayBuffer();
+    response = await dbx.filesUpload({
+      path: filename,
+      contents: fileBuffer
+    });
+  } catch (uploadError) {
+    console.error("Image upload failed (filesUpload step):", uploadError.error || uploadError);
+    authOverlay.style.display = 'none';
+    throw uploadError;
+  }
+    
+  try {
+    // Create a shared link so the image can be displayed in the browser
+    const linkRes = await dbx.sharingCreateSharedLinkWithSettings({
+        path: response.result.path_display,
+        settings: { requested_visibility: { '.tag': 'public' } }
+    });
+    
+    authOverlay.style.display = 'none';
+    
+    // Transform standard dropbox URLs into direct CDN links to avoid browser tracking blocks
+    return linkRes.result.url.replace('www.dropbox.com', 'dl.dropboxusercontent.com').replace('?dl=0', '');
+  } catch (linkError) {
+      console.error("Shared link creation failed (sharingCreateSharedLink step):", linkError.error || linkError);
+      authOverlay.style.display = 'none';
+      throw linkError;
+  }
 }
 
 // --- Routing & UI Orchestrated Animations ---
@@ -330,7 +303,8 @@ function handleRoute(noAnimate = false) {
   if (hash !== '/add' && editingId) {
     editingId = null;
     btnSaveEntry.textContent = 'Save Post';
-    addText.value = ''; addLink.value = ''; addImage.value = ''; addImageUrl = ''; addTags = [];
+    addTitle.value = ''; addDescription.value = ''; addLink.value = ''; addImage.value = ''; 
+    addImageUrl = ''; addThumbUrl = ''; addTags = [];
     addAnchor.value = '';
     btnShowAnchor.style.display = 'flex';
     anchorContainer.style.display = 'none';
@@ -517,8 +491,15 @@ function createCardElement(item) {
   const itemDiv = document.createElement('div');
   itemDiv.className = 'masonry-item';
 
-  let driveId = extractDriveId(item.image);
-  let imgSource = driveId ? `https://drive.google.com/thumbnail?id=${driveId}&sz=w1000` : item.image;
+  // Use the ultra-fast thumbnail for the feed if available, fallback to full image
+  let imgSource = item.thumb || item.image;
+  
+  // Automatically fix existing Dropbox links to prevent Safari/strict browser breakage
+  if (imgSource && imgSource.includes('dropbox.com')) {
+    imgSource = imgSource.replace('www.dropbox.com', 'dl.dropboxusercontent.com')
+                         .replace('?raw=1', '')
+                         .replace('?dl=0', '');
+  }
 
   const article = document.createElement('article');
   article.dataset.id = item.id;
@@ -535,22 +516,23 @@ function createCardElement(item) {
     article.style.border = '1px solid var(--tertiary-fixed-dim)';
     article.innerHTML = `
       <div style="display:flex;flex-direction:column;gap:var(--spacing-md);">
-        <h2 class="font-headline-md" style="line-height:1.3;word-break:break-word;white-space:pre-wrap;font-size:clamp(14px,4.5vw,24px);">${item.title}</h2>
+        <h2 class="font-headline-md" style="line-height:1.3; display:-webkit-box; -webkit-line-clamp:4; -webkit-box-orient:vertical; overflow:hidden; text-overflow:ellipsis; word-break:break-word; font-size:clamp(14px,4.5vw,24px);">${item.title}</h2>
         ${item.url ? `<a href="https://${item.url.replace(/^https?:\/\//, '')}" target="_blank" class="font-body-md" style="display:block;margin-top:var(--spacing-sm);color:var(--outline);text-decoration:underline;">${displayLinkText}</a>` : ''}
       </div>`;
   } else {
     article.style.backgroundColor = 'transparent';
     const safeRatio = (item.aspectRatio && item.aspectRatio !== 'NaN%') ? item.aspectRatio : '100%';
+    
+    // Added loading="lazy" to the feed <img> tag to save bandwidth
     article.innerHTML = `
-      <div class="shadow-ambient" style="position:relative;width:100%;padding-bottom:${safeRatio};background-color:var(--surface-container-low);overflow:hidden;border-radius:var(--rounded-xl);transform:translateZ(0);-webkit-mask-image:-webkit-radial-gradient(white,black);">
-        <img src="${imgSource}" data-drive-id="${driveId || ''}" alt="" class="img-hover" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover; pointer-events:none;"
-          onerror="window.handleImageError(this)" />
+      <div class="shadow-ambient" style="position:relative;width:100%;padding-bottom:${safeRatio};background-color:var(--surface-container-highest);overflow:hidden;border-radius:var(--rounded-xl);transform:translateZ(0);-webkit-mask-image:-webkit-radial-gradient(white,black);">
+        <img src="${imgSource}" loading="lazy" alt="" class="img-hover" onerror="this.style.opacity='0'" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover; pointer-events:none; transition: opacity 0.3s;"/>
         <div style="position:absolute;bottom:0;left:0;width:100%;padding:32px 12px 12px;display:flex;flex-direction:column;gap:6px;z-index:2;pointer-events:none;">
           ${item.url ? `<a href="https://${item.url.replace(/^https?:\/\//, '')}" target="_blank" style="display:flex;align-items:center;gap:4px;color:rgba(255,255,255,0.95);text-decoration:none;font-size:12px;text-shadow:0 1px 4px rgba(0,0,0,0.8), 0 0 10px rgba(0,0,0,0.5);"><span class="material-symbols-outlined" style="font-size:14px;">link</span>${displayLinkText}</a>` : ''}
         </div>
       </div>
       <div style="padding:6px 8px 0;">
-        <h2 class="font-headline-md" style="color:var(--on-background);display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden;font-size:14px;line-height:1.2;white-space:pre-wrap;">${item.title}</h2>
+        <h2 class="font-headline-md" style="color:var(--on-background); display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; text-overflow:ellipsis; word-break:break-word; font-size:14px; line-height:1.2;">${item.title}</h2>
       </div>`;
   }
 
@@ -595,10 +577,7 @@ function createCardElement(item) {
         window.open(link.href, link.target || '_blank');
         return;
       }
-      
-      const clickedImg = article.querySelector('img');
-      const loadedSrc = clickedImg ? clickedImg.src : null;
-      openDetailSheet(item, loadedSrc);
+      openDetailSheet(item, imgSource);
     }
   });
 
@@ -641,6 +620,7 @@ function renderSearchFeed() {
     let matchesQuery = true;
     if (query) {
       matchesQuery = (entry.title && entry.title.toLowerCase().includes(query)) || 
+                     (entry.description && entry.description.toLowerCase().includes(query)) ||
                      (entry.url && entry.url.toLowerCase().includes(query)) ||
                      (entry.anchorText && entry.anchorText.toLowerCase().includes(query));
     }
@@ -795,7 +775,7 @@ function updateTagSelectionState(instant = false) {
   }
 }
 
-// --- Detail Sheet & History API ---
+// --- Detail Sheet & Progressive Image Loading ---
 window.addEventListener('popstate', (e) => {
   if (isDetailSheetOpen) {
     closeDetailSheet(true); 
@@ -811,22 +791,30 @@ function openDetailSheet(item, preloadedSrc = null) {
 
   let imgHtml = '';
   if (item.image) {
-    let sheetImgSource = preloadedSrc || item.image;
-    let driveId = '';
+    let sheetImgSource = item.image;
+    let sheetThumbSource = item.thumb || preloadedSrc || sheetImgSource;
     
-    if (!preloadedSrc) {
-      driveId = extractDriveId(item.image) || '';
-      if (driveId) {
-        sheetImgSource = `https://drive.google.com/thumbnail?id=${driveId}&sz=w1000`;
-      }
-    } else {
-      driveId = extractDriveId(item.image) || '';
+    // Fix existing Dropbox links
+    if (sheetImgSource && sheetImgSource.includes('dropbox.com')) {
+      sheetImgSource = sheetImgSource.replace('www.dropbox.com', 'dl.dropboxusercontent.com')
+                                     .replace('?raw=1', '')
+                                     .replace('?dl=0', '');
     }
-
+    if (sheetThumbSource && sheetThumbSource.includes('dropbox.com')) {
+      sheetThumbSource = sheetThumbSource.replace('www.dropbox.com', 'dl.dropboxusercontent.com')
+                                         .replace('?raw=1', '')
+                                         .replace('?dl=0', '');
+    }
+    
+    // Progressive Loading UI (Blurry thumbnail instantly loads, High-Res fades in smoothly)
     imgHtml = `
       <div style="margin-bottom: 20px; width: 100%; display: flex; justify-content: center;">
-        <div style="border-radius: var(--rounded-xl); overflow: hidden; transform: translateZ(0); -webkit-mask-image: -webkit-radial-gradient(white, black); display: inline-block; background-color: var(--surface-container-low); max-width: 100%;">
-          <img src="${sheetImgSource}" data-drive-id="${driveId}" alt="" style="display: block; max-height: 40vh; max-width: 100%; width: auto; height: auto;" onerror="window.handleImageError(this)" />
+        <div style="position: relative; border-radius: var(--rounded-xl); overflow: hidden; transform: translateZ(0); -webkit-mask-image: -webkit-radial-gradient(white, black); display: inline-block; background-color: var(--surface-container-low); max-width: 100%;">
+          
+          <img src="${sheetThumbSource}" alt="" onerror="this.style.display='none'" style="display: block; max-height: 40vh; max-width: 100%; width: auto; height: auto; filter: ${item.thumb ? 'blur(10px)' : 'none'}; transform: ${item.thumb ? 'scale(1.05)' : 'none'};" />
+          
+          ${item.thumb ? `<img src="${sheetImgSource}" alt="" onload="this.style.opacity='1'" style="position: absolute; top: 0; left: 0; display: block; width: 100%; height: 100%; object-fit: inherit; opacity: 0; transition: opacity 0.5s ease-in-out;" />` : ''}
+          
         </div>
       </div>
     `;
@@ -836,7 +824,8 @@ function openDetailSheet(item, preloadedSrc = null) {
 
   detailContent.innerHTML = `
     ${imgHtml}
-    <h1 style="font-family: var(--font-family); font-size: 22px; font-weight: 600; line-height: 1.3; color: var(--on-surface); margin-bottom: 12px; word-break: break-word; white-space: pre-wrap;">${item.title}</h1>
+    <h1 style="font-family: var(--font-family); font-size: 22px; font-weight: 600; line-height: 1.3; color: var(--on-surface); margin-bottom: 8px; word-break: break-word; white-space: pre-wrap;">${item.title}</h1>
+    ${item.description ? `<p style="font-family: var(--font-family); font-size: 16px; font-weight: 400; line-height: 1.5; color: var(--on-surface-variant); margin-bottom: 16px; word-break: break-word; white-space: pre-wrap;">${item.description}</p>` : ''}
     ${item.url ? `<a href="https://${item.url.replace(/^https?:\/\//, '')}" target="_blank" style="display: inline-flex; align-items: center; gap: 6px; color: var(--outline); text-decoration: none; font-size: 14px; margin-bottom: 20px;"><span class="material-symbols-outlined" style="font-size: 16px;">open_in_new</span>${displayLinkText}</a>` : ''}
     ${item.tags ? `<div style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px;">${item.tags.map(tag => `<span class="font-label-sm" style="background-color: var(--surface-container-high); color: var(--on-surface-variant); padding: 6px 14px; border-radius: 9999px; font-size: 13px;">${tag}</span>`).join('')}</div>` : ''}
   `;
@@ -861,7 +850,6 @@ function closeDetailSheet(fromHistory = false) {
 detailBackdrop.addEventListener('click', () => closeDetailSheet(false));
 btnSheetClose.addEventListener('click', () => closeDetailSheet(false));
 
-// --- Custom Prompt Modal Logic ---
 function openEditTagModal(oldTag) {
   return new Promise((resolve) => {
     tagEditInput.value = oldTag;
@@ -870,7 +858,6 @@ function openEditTagModal(oldTag) {
     tagEditModal.style.transform = 'scale(1)';
     tagEditModal.style.opacity = '1';
     
-    // Auto-focus input
     setTimeout(() => { 
       tagEditInput.focus(); 
       tagEditInput.select(); 
@@ -899,16 +886,17 @@ function openEditTagModal(oldTag) {
   });
 }
 
-// --- Edit Entry Logic ---
 function startEditMode(id) {
   const entry = entries.find(e => e.id === id);
   if (!entry) return;
 
   editingId = id;
-  addText.value = entry.title || '';
+  addTitle.value = entry.title || '';
+  addDescription.value = entry.description || '';
   addLink.value = entry.url || '';
   addAnchor.value = entry.anchorText || '';
   addImageUrl = entry.image || '';
+  addThumbUrl = entry.thumb || '';
   addImageAspectRatio = entry.aspectRatio || '100%';
   addTags = entry.tags ? [...entry.tags] : [];
   
@@ -921,6 +909,7 @@ function startEditMode(id) {
   }
   
   pendingImageFile = null;
+  pendingThumbFile = null;
   addImage.value = ''; 
 
   btnSaveEntry.textContent = 'Update Post';
@@ -950,13 +939,16 @@ btnSheetEdit.addEventListener('click', () => {
   if (currentDetailId) startEditMode(currentDetailId);
 });
 
-// --- Add Entry Logic ---
+// --- Add Entry & Dual-Tier Compression Logic ---
 let addTags = [];
 let addImageUrl = '';
+let addThumbUrl = ''; 
 let addImageAspectRatio = '100%';
 let pendingImageFile = null;
+let pendingThumbFile = null; 
 
-const addText = document.getElementById('add-text');
+const addTitle = document.getElementById('add-title');
+const addDescription = document.getElementById('add-description');
 const addLink = document.getElementById('add-link');
 const addAnchor = document.getElementById('add-anchor');
 const btnShowAnchor = document.getElementById('btn-show-anchor');
@@ -976,41 +968,43 @@ if (btnShowAnchor) {
 }
 
 function renderAddPreview() {
-  const text = addText.value || (editingId ? 'Edit Preview' : 'Preview');
+  const text = addTitle.value || (editingId ? 'Edit Preview' : 'Preview');
   const link = addLink.value;
   const displayLinkText = addAnchor.value.trim() || link;
   let html = '';
 
-  if (!addImageUrl) {
+  // Use the ultra-fast thumb URL for the add preview to save memory
+  let previewImgSource = addThumbUrl || addImageUrl;
+
+  if (!previewImgSource) {
     html = `
       <div style="max-width: 240px; margin: 0 auto;">
         <article class="shadow-ambient" style="position: relative; background-color: var(--surface-container-low); color: var(--on-surface); border-radius: var(--rounded-xl); padding: var(--spacing-md); border: 1px solid var(--tertiary-fixed-dim); transform: translateZ(0); -webkit-mask-image: -webkit-radial-gradient(white, black);">
           <div>
-            <h2 class="font-headline-md" style="line-height: 1.3; word-break: break-word; white-space: pre-wrap; font-size: clamp(14px, 4.5vw, 24px);">${text}</h2>
+            <h2 class="font-headline-md" style="line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; text-overflow: ellipsis; word-break: break-word; font-size: clamp(14px, 4.5vw, 24px);">${text}</h2>
             ${link ? `<a href="https://${link.replace(/^https?:\/\//, '')}" target="_blank" class="font-body-md" style="display: block; margin-top: var(--spacing-sm); color: var(--outline); word-break: break-all; text-decoration: underline; pointer-events: none;">${displayLinkText}</a>` : ''}
           </div>
         </article>
       </div>
     `;
   } else {
-    let previewSrc = addImageUrl;
-    let driveId = extractDriveId(addImageUrl) || '';
-    
-    if (driveId) {
-      previewSrc = `https://drive.google.com/thumbnail?id=${driveId}&sz=w1000`;
+    if (previewImgSource.includes('dropbox.com')) {
+      previewImgSource = previewImgSource.replace('www.dropbox.com', 'dl.dropboxusercontent.com')
+                                         .replace('?raw=1', '')
+                                         .replace('?dl=0', '');
     }
-
+      
     html = `
       <div style="max-width: 240px; margin: 0 auto;">
         <article style="position: relative; background-color: transparent; border-radius: var(--rounded-xl); border: none;">
-          <div class="shadow-ambient" style="position: relative; width: 100%; padding-bottom: ${addImageAspectRatio}; background-color: var(--surface-container-low); overflow: hidden; border-radius: var(--rounded-xl);">
-            <img src="${previewSrc}" data-drive-id="${driveId}" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; border-radius: var(--rounded-xl);" onerror="window.handleImageError(this)" />
+          <div class="shadow-ambient" style="position: relative; width: 100%; padding-bottom: ${addImageAspectRatio}; background-color: var(--surface-container-highest); overflow: hidden; border-radius: var(--rounded-xl);">
+            <img src="${previewImgSource}" onerror="this.style.opacity='0'" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; border-radius: var(--rounded-xl); transition: opacity 0.3s;" />
             <div style="position: absolute; bottom: 0; left: 0; width: 100%; padding: 32px 12px 12px; display: flex; flex-direction: column; gap: 6px; z-index: 2;">
               ${link ? `<div class="font-body-md" style="display: flex; align-items: center; gap: 4px; color: rgba(255,255,255,0.95); font-size: 12px; text-shadow: 0 1px 4px rgba(0,0,0,0.8), 0 0 10px rgba(0,0,0,0.5);"><span class="material-symbols-outlined" style="font-size: 14px;">link</span>${displayLinkText.replace(/^https?:\/\//, '')}</div>` : ''}
             </div>
           </div>
           <div style="padding: 6px 8px 0; display: flex; flex-direction: column;">
-            <h2 class="font-headline-md" style="color: var(--on-background); display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; font-size: 14px; line-height: 1.2; white-space: pre-wrap;">${text}</h2>
+            <h2 class="font-headline-md" style="color: var(--on-background); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; text-overflow: ellipsis; word-break: break-word; font-size: 14px; line-height: 1.2;">${text}</h2>
           </div>
         </article>
       </div>
@@ -1149,13 +1143,16 @@ function renderTags() {
   }
 }
 
-addText.addEventListener('input', renderAddPreview);
+addTitle.addEventListener('input', renderAddPreview);
+addDescription.addEventListener('input', renderAddPreview);
 addLink.addEventListener('input', renderAddPreview);
 if (addAnchor) addAnchor.addEventListener('input', renderAddPreview);
 
 addImage.addEventListener('input', (e) => {
   addImageUrl = e.target.value;
+  addThumbUrl = addImageUrl; // Fallback to same URL if typed manually
   pendingImageFile = null;
+  pendingThumbFile = null;
   if (addImageUrl) {
     const img = new Image();
     img.onload = () => {
@@ -1168,45 +1165,116 @@ addImage.addEventListener('input', (e) => {
   }
 });
 
-addImageFile.addEventListener('change', (e) => {
+// Helper function to dynamically compress images
+function compressImage(file, maxWidth = 1200, quality = 0.8, prefix = "img") {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = (event) => {
+      const img = new Image();
+      img.src = event.target.result;
+      img.onload = () => {
+        let width = img.width;
+        let height = img.height;
+        
+        if (width > maxWidth) {
+          height = Math.round((height * maxWidth) / width);
+          width = maxWidth;
+        }
+        
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+        
+        canvas.toBlob((blob) => {
+          if (!blob) return reject(new Error('Canvas is empty'));
+          const newFileName = file.name.replace(/\.[^/.]+$/, "") + `_${prefix}.webp`;
+          const newFile = new File([blob], newFileName, {
+            type: 'image/webp',
+            lastModified: Date.now(),
+          });
+          
+          resolve({
+            file: newFile,
+            dataUrl: canvas.toDataURL('image/webp', quality),
+            width: width,
+            height: height
+          });
+        }, 'image/webp', quality);
+      };
+      img.onerror = (error) => reject(error);
+    };
+    reader.onerror = (error) => reject(error);
+  });
+}
+
+addImageFile.addEventListener('change', async (e) => {
   const file = e.target.files[0];
   if (file) {
-    pendingImageFile = file;
-    const reader = new FileReader();
-    reader.onload = () => {
-      addImageUrl = reader.result;
-      addImage.value = file.name;
-      const img = new Image();
-      img.onload = () => {
-        addImageAspectRatio = ((img.height / img.width) * 100).toFixed(2) + '%';
-        renderAddPreview();
-      };
-      img.src = addImageUrl;
-    };
-    reader.readAsDataURL(file);
+    authOverlay.style.display = 'flex';
+    authStatus.textContent = 'Optimizing images...';
+    authStatus.style.display = 'block';
+
+    try {
+      // 1. Generate High-Res version for Detail Sheet
+      const full = await compressImage(file, 1600, 0.85, "full");
+      // 2. Generate Ultra-Fast Thumbnail for Home Feed
+      const thumb = await compressImage(file, 400, 0.6, "thumb");
+      
+      pendingImageFile = full.file;
+      pendingThumbFile = thumb.file;
+      
+      addImageUrl = full.dataUrl;
+      addThumbUrl = thumb.dataUrl;
+      addImage.value = full.file.name;
+      addImageAspectRatio = ((full.height / full.width) * 100).toFixed(2) + '%';
+      
+      renderAddPreview();
+    } catch (err) {
+      console.error("Compression failed:", err);
+      showToast("Failed to optimize image.");
+    } finally {
+      authOverlay.style.display = 'none';
+    }
   }
 });
 
 btnSaveEntry.addEventListener('click', async () => {
-  if (!addText.value.trim()) return;
+  if (!addTitle.value.trim()) return;
 
   const originalText = btnSaveEntry.textContent;
   btnSaveEntry.textContent = 'Saving...';
   btnSaveEntry.style.pointerEvents = 'none';
 
   let finalImageUrl = addImageUrl;
+  let finalThumbUrl = addThumbUrl;
   let successMessage = ''; 
 
   try {
-    if (pendingImageFile) finalImageUrl = await uploadImageToDrive(pendingImageFile);
+    // Concurrently upload both images to Dropbox to save time
+    if (pendingImageFile && pendingThumbFile) {
+      const [fullUrlRes, thumbUrlRes] = await Promise.all([
+        uploadImageToDropbox(pendingImageFile),
+        uploadImageToDropbox(pendingThumbFile)
+      ]);
+      finalImageUrl = fullUrlRes;
+      finalThumbUrl = thumbUrlRes;
+    } else if (pendingImageFile) {
+      finalImageUrl = await uploadImageToDropbox(pendingImageFile);
+      finalThumbUrl = finalImageUrl;
+    }
 
     if (editingId) {
       const index = entries.findIndex(e => e.id === editingId);
       if (index !== -1) {
-        entries[index].title = addText.value;
+        entries[index].title = addTitle.value;
+        entries[index].description = addDescription.value;
         entries[index].url = addLink.value;
         entries[index].anchorText = addAnchor.value.trim();
         entries[index].image = finalImageUrl;
+        entries[index].thumb = finalThumbUrl;
         entries[index].aspectRatio = addImageAspectRatio;
         entries[index].tags = [...addTags];
         entries[index].type = addTags[0] || 'Note';
@@ -1215,10 +1283,12 @@ btnSaveEntry.addEventListener('click', async () => {
     } else {
       entries.unshift({
         id: Date.now().toString(),
-        title: addText.value,
+        title: addTitle.value,
+        description: addDescription.value,
         url: addLink.value,
         anchorText: addAnchor.value.trim(),
         image: finalImageUrl,
+        thumb: finalThumbUrl,
         aspectRatio: addImageAspectRatio,
         tags: [...addTags],
         type: addTags[0] || 'Note'
@@ -1226,11 +1296,13 @@ btnSaveEntry.addEventListener('click', async () => {
       successMessage = 'Post saved!'; 
     }
 
-    await saveDataToDrive();
+    await saveDataToDropbox();
 
-    addText.value = ''; addLink.value = ''; addImage.value = ''; addImageUrl = ''; 
-    addAnchor.value = ''; btnShowAnchor.style.display = 'flex'; anchorContainer.style.display = 'none';
-    pendingImageFile = null; addTags = []; editingId = null;
+    addTitle.value = ''; addDescription.value = ''; addLink.value = ''; addImage.value = ''; 
+    addImageUrl = ''; addThumbUrl = ''; addAnchor.value = ''; 
+    btnShowAnchor.style.display = 'flex'; anchorContainer.style.display = 'none';
+    pendingImageFile = null; pendingThumbFile = null; 
+    addTags = []; editingId = null;
     btnSaveEntry.textContent = 'Save Post';
     
     updateAvailableTags(); 
@@ -1269,32 +1341,21 @@ window.addEventListener('resize', () => {
 
 btnDelete.addEventListener('click', async () => {
   authOverlay.style.display = 'flex';
-  authStatus.textContent = 'Deleting from Drive...';
+  authStatus.textContent = 'Deleting from Dropbox...';
   authStatus.style.display = 'block';
-
-  const entriesToDelete = entries.filter(e => selectedIds.includes(e.id));
-  for (const item of entriesToDelete) {
-    const driveId = extractDriveId(item.image);
-    if (driveId) {
-      try {
-        await fetch(`https://www.googleapis.com/drive/v3/files/${driveId}`, {
-          method: 'DELETE',
-          headers: { 'Authorization': 'Bearer ' + gapi.client.getToken().access_token }
-        });
-      } catch (e) {
-        console.error("Error deleting image from Drive:", e);
-      }
-    }
-  }
 
   const count = selectedIds.length;
   entries = entries.filter(e => !selectedIds.includes(e.id));
   selectedIds = [];
 
-  await saveDataToDrive();
+  try {
+     await saveDataToDropbox();
+     showToast(`${count} item(s) deleted`);
+  } catch(e) {
+     showToast("Failed to delete items.");
+  }
 
   authOverlay.style.display = 'none';
-  showToast(`${count} item(s) deleted`);
   renderFeed();
   updateSelectionState(true); 
 });
@@ -1322,12 +1383,15 @@ if (btnDeleteTag) {
     const count = selectedTags.length;
     selectedTags = [];
 
-    await saveDataToDrive();
+    try {
+        await saveDataToDropbox();
+        updateAvailableTags();
+        showToast(`${count} tag(s) deleted`);
+    } catch(e) {
+        showToast("Failed to delete tags.");
+    }
     
-    updateAvailableTags();
     authOverlay.style.display = 'none';
-    showToast(`${count} tag(s) deleted`);
-    
     updateTagSelectionState(true);
     renderSearchTags(); 
     renderSearchFeed();
@@ -1369,12 +1433,15 @@ if (btnEditTag) {
 
     selectedTags = [];
 
-    await saveDataToDrive();
+    try {
+        await saveDataToDropbox();
+        updateAvailableTags();
+        showToast(`Tag updated!`);
+    } catch(e) {
+        showToast('Failed to update tag.');
+    }
     
-    updateAvailableTags();
     authOverlay.style.display = 'none';
-    showToast(`Tag updated!`);
-    
     updateTagSelectionState(true);
     renderSearchTags(); 
     renderSearchFeed();
@@ -1389,20 +1456,7 @@ if (btnCloseTagSelection) {
 }
 
 document.getElementById('btn-logout').addEventListener('click', () => {
-  localStorage.removeItem('onespot_token');
+  localStorage.removeItem('onespot_dbx_refresh');
   window.location.hash = '#/';
   window.location.reload();
 });
-
-// --- PWA Service Worker Registration ---
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js')
-      .then((registration) => {
-        console.log('ServiceWorker registration successful with scope: ', registration.scope);
-      })
-      .catch((error) => {
-        console.log('ServiceWorker registration failed: ', error);
-      });
-  });
-}
