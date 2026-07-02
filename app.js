@@ -95,6 +95,19 @@ function showToast(message) {
   }, 3000);
 }
 
+// Auto-save debouncing for checklist updates
+let saveTimeout = null;
+function scheduleSave() {
+  clearTimeout(saveTimeout);
+  saveTimeout = setTimeout(async () => {
+    try {
+      await saveDataToDropbox();
+    } catch (err) {
+      console.error('Failed to auto-save checklist state:', err);
+    }
+  }, 1000);
+}
+
 // --- Dropbox Initialization & PKCE Auth ---
 window.onload = async function () {
   // Dropbox OAuth requires a real http(s) origin. Opening this file directly
@@ -308,6 +321,10 @@ function handleRoute(noAnimate = false) {
     addAnchor.value = '';
     btnShowAnchor.style.display = 'flex';
     anchorContainer.style.display = 'none';
+    
+    isListMode = false;
+    updateListButtonUI();
+    
     renderAddPreview(); renderTags();
   }
 
@@ -582,6 +599,7 @@ function createCardElement(item) {
   });
 
   itemDiv.appendChild(article);
+  
   return itemDiv;
 }
 
@@ -619,10 +637,16 @@ function renderSearchFeed() {
 
     let matchesQuery = true;
     if (query) {
+      let matchesChecklist = false;
+      if (entry.checklist) {
+          matchesChecklist = entry.checklist.some(c => c.text.toLowerCase().includes(query));
+      }
+        
       matchesQuery = (entry.title && entry.title.toLowerCase().includes(query)) || 
                      (entry.description && entry.description.toLowerCase().includes(query)) ||
                      (entry.url && entry.url.toLowerCase().includes(query)) ||
-                     (entry.anchorText && entry.anchorText.toLowerCase().includes(query));
+                     (entry.anchorText && entry.anchorText.toLowerCase().includes(query)) ||
+                     matchesChecklist;
     }
     
     let matchesTag = true;
@@ -821,14 +845,59 @@ function openDetailSheet(item, preloadedSrc = null) {
   }
   
   const displayLinkText = item.anchorText || item.url;
+  
+  let sheetChecklistHtml = '';
+  if (item.isList && item.checklist && item.checklist.length > 0) {
+    sheetChecklistHtml = '<div style="margin-top: 16px; margin-bottom: 24px; display: flex; flex-direction: column; gap: 12px;">';
+    item.checklist.forEach((task, index) => {
+      sheetChecklistHtml += `
+        <label style="display: flex; align-items: flex-start; gap: 12px; cursor: pointer;" class="detail-checkbox-label">
+          <input type="checkbox" data-entry-id="${item.id}" data-index="${index}" class="detail-checkbox" ${task.checked ? 'checked' : ''} style="margin-top: 3px; width: 20px; height: 20px; accent-color: var(--primary); cursor: pointer; flex-shrink: 0;">
+          <span class="font-body-lg" style="font-size: 16px; line-height: 1.5; color: ${task.checked ? 'var(--outline)' : 'var(--on-surface)'}; text-decoration: ${task.checked ? 'line-through' : 'none'}; transition: all 0.2s; word-break: break-word;">${task.text}</span>
+        </label>
+      `;
+    });
+    sheetChecklistHtml += '</div>';
+  }
 
   detailContent.innerHTML = `
     ${imgHtml}
     <h1 style="font-family: var(--font-family); font-size: 22px; font-weight: 600; line-height: 1.3; color: var(--on-surface); margin-bottom: 8px; word-break: break-word; white-space: pre-wrap;">${item.title}</h1>
     ${item.description ? `<p style="font-family: var(--font-family); font-size: 16px; font-weight: 400; line-height: 1.5; color: var(--on-surface-variant); margin-bottom: 16px; word-break: break-word; white-space: pre-wrap;">${item.description}</p>` : ''}
+    ${sheetChecklistHtml}
     ${item.url ? `<a href="https://${item.url.replace(/^https?:\/\//, '')}" target="_blank" style="display: inline-flex; align-items: center; gap: 6px; color: var(--outline); text-decoration: none; font-size: 14px; margin-bottom: 20px;"><span class="material-symbols-outlined" style="font-size: 16px;">open_in_new</span>${displayLinkText}</a>` : ''}
     ${item.tags ? `<div style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px;">${item.tags.map(tag => `<span class="font-label-sm" style="background-color: var(--surface-container-high); color: var(--on-surface-variant); padding: 6px 14px; border-radius: 9999px; font-size: 13px;">${tag}</span>`).join('')}</div>` : ''}
   `;
+
+  const detailLabels = detailContent.querySelectorAll('.detail-checkbox-label');
+  detailLabels.forEach(label => {
+    label.addEventListener('click', e => e.stopPropagation());
+  });
+
+  const detailCheckboxes = detailContent.querySelectorAll('.detail-checkbox');
+  detailCheckboxes.forEach(cb => {
+    cb.addEventListener('change', (e) => {
+      const entryId = e.target.dataset.entryId;
+      const idx = parseInt(e.target.dataset.index);
+      const entry = entries.find(en => en.id === entryId);
+      
+      if (entry && entry.checklist) {
+        entry.checklist[idx].checked = e.target.checked;
+        
+        // Update Sheet styling
+        const span = e.target.nextElementSibling;
+        if (e.target.checked) {
+          span.style.textDecoration = 'line-through';
+          span.style.color = 'var(--outline)';
+        } else {
+          span.style.textDecoration = 'none';
+          span.style.color = 'var(--on-surface)';
+        }
+        
+        scheduleSave();
+      }
+    });
+  });
 
   document.body.style.overflow = 'hidden';
   detailBackdrop.style.pointerEvents = 'auto';
@@ -892,7 +961,16 @@ function startEditMode(id) {
 
   editingId = id;
   addTitle.value = entry.title || '';
-  addDescription.value = entry.description || '';
+  
+  if (entry.isList) {
+    isListMode = true;
+    addDescription.value = entry.checklist ? entry.checklist.map(c => c.text).join('\n') : '';
+  } else {
+    isListMode = false;
+    addDescription.value = entry.description || '';
+  }
+  updateListButtonUI();
+  
   addLink.value = entry.url || '';
   addAnchor.value = entry.anchorText || '';
   addImageUrl = entry.image || '';
@@ -946,6 +1024,7 @@ let addThumbUrl = '';
 let addImageAspectRatio = '100%';
 let pendingImageFile = null;
 let pendingThumbFile = null; 
+let isListMode = false;
 
 const addTitle = document.getElementById('add-title');
 const addDescription = document.getElementById('add-description');
@@ -958,6 +1037,29 @@ const addImageFile = document.getElementById('add-image-file');
 const addPreviewContainer = document.getElementById('add-preview-container');
 const tagsContainer = document.getElementById('tags-container');
 const btnSaveEntry = document.getElementById('btn-save-entry');
+const btnToggleList = document.getElementById('btn-toggle-list');
+
+if (btnToggleList) {
+  btnToggleList.addEventListener('click', () => {
+    isListMode = !isListMode;
+    updateListButtonUI();
+  });
+}
+
+function updateListButtonUI() {
+  if (!btnToggleList) return;
+  if (isListMode) {
+    btnToggleList.style.backgroundColor = 'var(--primary)';
+    btnToggleList.style.color = 'var(--on-primary)';
+    btnToggleList.style.borderColor = 'var(--primary)';
+    addDescription.placeholder = "Enter list items (one per line)...";
+  } else {
+    btnToggleList.style.backgroundColor = 'var(--surface-container-low)';
+    btnToggleList.style.color = 'var(--on-surface-variant)';
+    btnToggleList.style.borderColor = 'var(--outline-variant)';
+    addDescription.placeholder = "Description (optional)...";
+  }
+}
 
 if (btnShowAnchor) {
   btnShowAnchor.addEventListener('click', () => {
@@ -1251,6 +1353,26 @@ btnSaveEntry.addEventListener('click', async () => {
   let finalImageUrl = addImageUrl;
   let finalThumbUrl = addThumbUrl;
   let successMessage = ''; 
+  
+  // Format checklist if active mode
+  let finalChecklist = [];
+  let oldChecklist = [];
+  
+  if (editingId) {
+    const oldEntry = entries.find(e => e.id === editingId);
+    if (oldEntry && oldEntry.checklist) {
+      oldChecklist = oldEntry.checklist;
+    }
+  }
+  
+  if (isListMode && addDescription.value.trim()) {
+    const lines = addDescription.value.split('\n').filter(l => l.trim() !== '');
+    finalChecklist = lines.map(line => {
+      const text = line.trim();
+      const existing = oldChecklist.find(c => c.text === text);
+      return { text: text, checked: existing ? existing.checked : false };
+    });
+  }
 
   try {
     // Concurrently upload both images to Dropbox to save time
@@ -1270,7 +1392,9 @@ btnSaveEntry.addEventListener('click', async () => {
       const index = entries.findIndex(e => e.id === editingId);
       if (index !== -1) {
         entries[index].title = addTitle.value;
-        entries[index].description = addDescription.value;
+        entries[index].description = isListMode ? '' : addDescription.value;
+        entries[index].isList = isListMode;
+        entries[index].checklist = finalChecklist;
         entries[index].url = addLink.value;
         entries[index].anchorText = addAnchor.value.trim();
         entries[index].image = finalImageUrl;
@@ -1284,7 +1408,9 @@ btnSaveEntry.addEventListener('click', async () => {
       entries.unshift({
         id: Date.now().toString(),
         title: addTitle.value,
-        description: addDescription.value,
+        description: isListMode ? '' : addDescription.value,
+        isList: isListMode,
+        checklist: finalChecklist,
         url: addLink.value,
         anchorText: addAnchor.value.trim(),
         image: finalImageUrl,
@@ -1303,6 +1429,8 @@ btnSaveEntry.addEventListener('click', async () => {
     btnShowAnchor.style.display = 'flex'; anchorContainer.style.display = 'none';
     pendingImageFile = null; pendingThumbFile = null; 
     addTags = []; editingId = null;
+    isListMode = false;
+    updateListButtonUI();
     btnSaveEntry.textContent = 'Save Post';
     
     updateAvailableTags(); 
