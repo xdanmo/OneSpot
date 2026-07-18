@@ -1,4 +1,4 @@
-const CACHE_NAME = 'onespot-cache-v2'; // Bumped version to trigger cache refresh
+const CACHE_NAME = 'onespot-cache-v3'; // Bumped version to trigger cache refresh
 const urlsToCache = [
   './',
   './index.html',
@@ -32,11 +32,15 @@ self.addEventListener('activate', event => {
 
 // Network-First Strategy
 self.addEventListener('fetch', event => {
+  // Only intercept GET requests
+  if (event.request.method !== 'GET') return;
+
   event.respondWith(
     fetch(event.request)
       .then(response => {
-        // If network request succeeds, update the cache and return the response
-        if (response && response.status === 200) {
+        // Only cache valid responses from our own origin (type === 'basic')
+        // This prevents caching opaque/cross-origin responses like Dropbox images which can bloat storage
+        if (response && response.status === 200 && response.type === 'basic') {
           const responseClone = response.clone();
           caches.open(CACHE_NAME).then(cache => {
             cache.put(event.request, responseClone);
@@ -45,8 +49,16 @@ self.addEventListener('fetch', event => {
         return response;
       })
       .catch(() => {
-        // If network fails (e.g., offline), fall back to the cache
-        return caches.match(event.request);
+        // If network fails (e.g., offline or blocked by adblocker), fall back to the cache
+        return caches.match(event.request).then(cachedResponse => {
+          if (cachedResponse) {
+            return cachedResponse;
+          }
+          // IMPORTANT: If not in cache, we MUST return a valid Response object 
+          // to prevent the "FetchEvent.respondWith received an error: Returned response is null" crash.
+          // This allows the browser to gracefully fire the <img> onerror handler.
+          return new Response(null, { status: 503, statusText: 'Service Unavailable' });
+        });
       })
   );
 });
