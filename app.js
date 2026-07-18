@@ -1,17 +1,16 @@
 const CLIENT_ID = '6sxijlqtwr8h6zk'; // Replace with your App Key. NEVER put your App Secret here.
 
+// --- Theme Initialization ---
+const savedTheme = localStorage.getItem('onespot_theme') || 'light';
+if (savedTheme === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
+
 // --- Auth URL Normalization ---
-// Fixes the "index.html" vs "/" mismatch problem for Dropbox Console.
-// It forces the app to always use the clean, root directory URL.
 let cleanPath = window.location.pathname;
 if (cleanPath.endsWith('index.html')) {
     cleanPath = cleanPath.replace('index.html', '');
-    // Instantly clean up the browser's address bar to match
     window.history.replaceState({}, document.title, window.location.origin + cleanPath + window.location.hash);
 }
 const REDIRECT_URI = window.location.origin + cleanPath;
-
-// --- Auth debugging ---
 console.log('[OneSpot Auth Debug] Normalized REDIRECT_URI:', REDIRECT_URI);
 
 let dbxAuth = null;
@@ -44,7 +43,8 @@ const tagSearchInput = document.getElementById('tag-search-input');
 const views = {
   '/': document.getElementById('view-home'),
   '/add': document.getElementById('view-add'),
-  '/profile': document.getElementById('view-profile')
+  '/profile': document.getElementById('view-profile'),
+  '/privacy': document.getElementById('view-privacy')
 };
 
 const navLinks = document.querySelectorAll('.nav-link');
@@ -74,6 +74,37 @@ const tagEditInput = document.getElementById('tag-edit-input');
 const btnTagEditCancel = document.getElementById('btn-tag-edit-cancel');
 const btnTagEditSave = document.getElementById('btn-tag-edit-save');
 
+const btnThemeToggle = document.getElementById('btn-theme-toggle');
+const themeToggleKnob = document.getElementById('theme-toggle-knob');
+
+// --- Theme Logic ---
+function updateThemeUI(theme) {
+  if (!btnThemeToggle || !themeToggleKnob) return;
+  const metaThemeColor = document.querySelector('meta[name="theme-color"]');
+  
+  if (theme === 'dark') {
+    themeToggleKnob.style.transform = 'translateX(20px)';
+    btnThemeToggle.style.background = 'var(--primary-container)';
+    if (metaThemeColor) metaThemeColor.setAttribute('content', '#121212');
+  } else {
+    themeToggleKnob.style.transform = 'translateX(0)';
+    btnThemeToggle.style.background = 'var(--surface-container-highest)';
+    if (metaThemeColor) metaThemeColor.setAttribute('content', '#f7f6f2');
+  }
+}
+
+updateThemeUI(savedTheme);
+
+if (btnThemeToggle) {
+  btnThemeToggle.addEventListener('click', () => {
+    const currentTheme = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+    const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+    
+    document.documentElement.setAttribute('data-theme', newTheme);
+    localStorage.setItem('onespot_theme', newTheme);
+    updateThemeUI(newTheme);
+  });
+}
 
 function showToast(message) {
   const navToast = document.getElementById('nav-toast');
@@ -95,7 +126,6 @@ function showToast(message) {
   }, 3000);
 }
 
-// Auto-save debouncing for checklist updates
 let saveTimeout = null;
 function scheduleSave() {
   clearTimeout(saveTimeout);
@@ -110,11 +140,7 @@ function scheduleSave() {
 
 // --- Dropbox Initialization & PKCE Auth ---
 window.onload = async function () {
-  // Dropbox OAuth requires a real http(s) origin. Opening this file directly
-  // (double-clicking index.html, file://...) produces an invalid redirect_uri
-  // and Dropbox will reject login with a generic "bad request" error.
   if (window.location.protocol === 'file:') {
-    console.error('[OneSpot Auth Debug] Blocked: page loaded via file:// — Dropbox OAuth cannot work here. Serve this folder through a local server (e.g. "npx serve" or VS Code Live Server) or deploy it, then reload.');
     authStatus.style.display = 'block';
     authStatus.textContent = 'This app needs to be served over http/https, not opened directly as a file. Run it through a local server or deploy it, then reload this page.';
     btnLogin.style.display = 'none';
@@ -143,23 +169,18 @@ window.onload = async function () {
       dbxAuth.setAccessToken(response.result.access_token);
       dbxAuth.setRefreshToken(response.result.refresh_token);
       
-      // Save refresh token securely in localStorage for persistent sessions
       localStorage.setItem('onespot_dbx_refresh', response.result.refresh_token);
       
-      // Clean up URL
       window.history.replaceState({}, document.title, window.location.pathname + window.location.hash);
       
       dbx = new Dropbox.Dropbox({ auth: dbxAuth });
       await initializeDropbox();
     } catch (error) {
-      console.error('Auth error:', error);
       const detail = (error && error.error && error.error.error_summary) || (error && error.message) || '';
-      console.error('[OneSpot Auth Debug] Failure detail:', detail || '(no extra detail returned)');
       showToast(detail ? `Login failed: ${detail}` : 'Login failed. Please try again.');
       resetAuthUI();
     }
   } else {
-    // Check if we have a saved refresh token
     const savedRefreshToken = localStorage.getItem('onespot_dbx_refresh');
     if (savedRefreshToken) {
       dbxAuth.setRefreshToken(savedRefreshToken);
@@ -177,17 +198,19 @@ window.onload = async function () {
 function resetAuthUI() {
   authStatus.style.display = 'none';
   btnLogin.style.display = 'block';
-  authOverlay.style.display = 'flex';
+  if (window.location.hash !== '#/privacy') {
+    authOverlay.style.display = 'flex';
+  } else {
+    authOverlay.style.display = 'none';
+  }
 }
 
 btnLogin.onclick = async () => {
   try {
     const authUrl = await dbxAuth.getAuthenticationUrl(REDIRECT_URI, undefined, 'code', 'offline', undefined, undefined, true);
     window.sessionStorage.setItem('codeVerifier', dbxAuth.getCodeVerifier());
-    console.log('[OneSpot Auth Debug] Navigating to Dropbox authorize URL:', authUrl);
     window.location.href = authUrl;
   } catch (error) {
-    console.error('Error generating auth URL:', error);
     showToast('Failed to start login process.');
   }
 };
@@ -199,7 +222,6 @@ async function initializeDropbox() {
   authOverlay.style.display = 'flex';
 
   try {
-    // Attempt to download the data.json file from the root of the App Folder
     try {
       const response = await dbx.filesDownload({ path: '/data.json' });
       dataFileRev = response.result.rev;
@@ -210,7 +232,6 @@ async function initializeDropbox() {
       
     } catch (err) {
       if (err.status === 409 && err.error && err.error.error_summary.includes('not_found')) {
-        // File doesn't exist, create an empty one
         entries = [];
         const fileContent = new Blob(['[]'], { type: 'application/json' });
         const uploadRes = await dbx.filesUpload({
@@ -236,7 +257,6 @@ async function initializeDropbox() {
     }
 
   } catch (err) {
-    console.error('Dropbox API Error:', err);
     if (err.status === 401) {
       localStorage.removeItem('onespot_dbx_refresh');
       resetAuthUI();
@@ -260,7 +280,6 @@ async function saveDataToDropbox() {
       });
       dataFileRev = response.result.rev;
   } catch(e) {
-      console.error("Failed to save data.json", e);
       showToast('Failed to save data.');
       throw e;
   }
@@ -271,37 +290,30 @@ async function uploadImageToDropbox(file) {
   authStatus.textContent = 'Uploading image...';
   authStatus.style.display = 'block';
 
-  // Generate a unique filename to prevent collisions in the App Folder
   const ext = file.name.split('.').pop();
   const filename = `/images/${Date.now()}_${Math.random().toString(36).substring(7)}.${ext}`;
   let response;
 
   try {
-    // Convert File object to ArrayBuffer to prevent browser serialization bugs that cause 400 Bad Request
     const fileBuffer = await file.arrayBuffer();
     response = await dbx.filesUpload({
       path: filename,
       contents: fileBuffer
     });
   } catch (uploadError) {
-    console.error("Image upload failed (filesUpload step):", uploadError.error || uploadError);
     authOverlay.style.display = 'none';
     throw uploadError;
   }
     
   try {
-    // Create a shared link so the image can be displayed in the browser
     const linkRes = await dbx.sharingCreateSharedLinkWithSettings({
         path: response.result.path_display,
         settings: { requested_visibility: { '.tag': 'public' } }
     });
     
     authOverlay.style.display = 'none';
-    
-    // Transform standard dropbox URLs into direct CDN links to avoid browser tracking blocks
     return linkRes.result.url.replace('www.dropbox.com', 'dl.dropboxusercontent.com').replace('?dl=0', '');
   } catch (linkError) {
-      console.error("Shared link creation failed (sharingCreateSharedLink step):", linkError.error || linkError);
       authOverlay.style.display = 'none';
       throw linkError;
   }
@@ -313,6 +325,13 @@ function handleRoute(noAnimate = false) {
   
   const hash = window.location.hash.replace('#', '') || '/';
 
+  const hasCode = window.location.search.includes('code=');
+  if (hash === '/privacy') {
+      authOverlay.style.display = 'none';
+  } else if (!dbx && !hasCode) {
+      resetAuthUI();
+  }
+
   if (hash !== '/add' && editingId) {
     editingId = null;
     btnSaveEntry.textContent = 'Save Post';
@@ -323,6 +342,7 @@ function handleRoute(noAnimate = false) {
     anchorContainer.style.display = 'none';
     
     isListMode = false;
+    currentListItems = [''];
     updateListButtonUI();
     
     renderAddPreview(); renderTags();
@@ -364,7 +384,8 @@ function handleRoute(noAnimate = false) {
 }
 
 function updateNavIndicator(hash, noAnimate = false) {
-  let activeIndex = 0; // Default to Home
+  let activeIndex = -1; // Default to -1 for paths without nav icons (e.g. privacy)
+  if (hash === '/' || hash === '') activeIndex = 0;
   if (hash.startsWith('/add')) activeIndex = 1;
   if (hash.startsWith('/profile')) activeIndex = 2;
 
@@ -381,23 +402,27 @@ function updateNavIndicator(hash, noAnimate = false) {
     }
   });
 
-  const activeLink = navLinks[activeIndex];
-  if (activeLink && navIndicator) {
-    if (noAnimate) navIndicator.style.transition = 'none';
+  if (activeIndex !== -1) {
+    const activeLink = navLinks[activeIndex];
+    if (activeLink && navIndicator) {
+      if (noAnimate) navIndicator.style.transition = 'none';
 
-    navIndicator.style.left = activeLink.offsetLeft + 'px';
-    navIndicator.style.top = activeLink.offsetTop + 'px';
-    navIndicator.style.width = activeLink.offsetWidth + 'px';
-    navIndicator.style.height = activeLink.offsetHeight + 'px';
-    
-    if (!isToastActive) {
-      navIndicator.style.opacity = '1';
-    }
+      navIndicator.style.left = activeLink.offsetLeft + 'px';
+      navIndicator.style.top = activeLink.offsetTop + 'px';
+      navIndicator.style.width = activeLink.offsetWidth + 'px';
+      navIndicator.style.height = activeLink.offsetHeight + 'px';
+      
+      if (!isToastActive) {
+        navIndicator.style.opacity = '1';
+      }
 
-    if (noAnimate) {
-      void navIndicator.offsetWidth; 
-      navIndicator.style.transition = 'all 0.5s ease';
+      if (noAnimate) {
+        void navIndicator.offsetWidth; 
+        navIndicator.style.transition = 'all 0.5s ease';
+      }
     }
+  } else {
+      if (navIndicator) navIndicator.style.opacity = '0';
   }
 }
 
@@ -448,7 +473,6 @@ function renderSearchTags() {
     filteredTags = availableTags.filter(tag => tag.toLowerCase().includes(tagSearchQuery));
   }
   
-  // Combine to ensure selected tags are always visible even if they don't match the search query
   const tagsToRender = Array.from(new Set([...filteredTags, ...selectedSearchTags]));
   
   let sortedTags = tagsToRender.sort((a, b) => {
@@ -508,14 +532,18 @@ function createCardElement(item) {
   const itemDiv = document.createElement('div');
   itemDiv.className = 'masonry-item';
 
-  // Use the ultra-fast thumbnail for the feed if available, fallback to full image
   let imgSource = item.thumb || item.image;
+  let fullSource = item.image;
   
-  // Automatically fix existing Dropbox links to prevent Safari/strict browser breakage
   if (imgSource && imgSource.includes('dropbox.com')) {
     imgSource = imgSource.replace('www.dropbox.com', 'dl.dropboxusercontent.com')
                          .replace('?raw=1', '')
                          .replace('?dl=0', '');
+  }
+  if (fullSource && fullSource.includes('dropbox.com')) {
+    fullSource = fullSource.replace('www.dropbox.com', 'dl.dropboxusercontent.com')
+                           .replace('?raw=1', '')
+                           .replace('?dl=0', '');
   }
 
   const article = document.createElement('article');
@@ -540,10 +568,9 @@ function createCardElement(item) {
     article.style.backgroundColor = 'transparent';
     const safeRatio = (item.aspectRatio && item.aspectRatio !== 'NaN%') ? item.aspectRatio : '100%';
     
-    // Added loading="lazy" to the feed <img> tag to save bandwidth
     article.innerHTML = `
       <div class="shadow-ambient" style="position:relative;width:100%;padding-bottom:${safeRatio};background-color:var(--surface-container-highest);overflow:hidden;border-radius:var(--rounded-xl);transform:translateZ(0);-webkit-mask-image:-webkit-radial-gradient(white,black);">
-        <img src="${imgSource}" loading="lazy" alt="" class="img-hover" onerror="this.style.opacity='0'" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover; pointer-events:none; transition: opacity 0.3s;"/>
+        <img src="${imgSource}" loading="lazy" decoding="async" alt="" class="img-hover" onerror="this.style.opacity='0'" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover; pointer-events:none; transition: opacity 0.3s;"/>
         <div style="position:absolute;bottom:0;left:0;width:100%;padding:32px 12px 12px;display:flex;flex-direction:column;gap:6px;z-index:2;pointer-events:none;">
           ${item.url ? `<a href="https://${item.url.replace(/^https?:\/\//, '')}" target="_blank" style="display:flex;align-items:center;gap:4px;color:rgba(255,255,255,0.95);text-decoration:none;font-size:12px;text-shadow:0 1px 4px rgba(0,0,0,0.8), 0 0 10px rgba(0,0,0,0.5);"><span class="material-symbols-outlined" style="font-size:14px;">link</span>${displayLinkText}</a>` : ''}
         </div>
@@ -551,6 +578,18 @@ function createCardElement(item) {
       <div style="padding:6px 8px 0;">
         <h2 class="font-headline-md" style="color:var(--on-background); display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; text-overflow:ellipsis; word-break:break-word; font-size:14px; line-height:1.2;">${item.title}</h2>
       </div>`;
+      
+      const preloadHighRes = () => {
+        if (!fullSource || imgSource === fullSource) return;
+        if (!article.dataset.preloaded) {
+          article.dataset.preloaded = 'true';
+          const preloader = new Image();
+          preloader.fetchPriority = "low"; 
+          preloader.src = fullSource;
+        }
+      };
+      article.addEventListener('mouseenter', preloadHighRes, { once: true });
+      article.addEventListener('touchstart', preloadHighRes, { once: true, passive: true });
   }
 
   let pressTimer = null;
@@ -606,7 +645,10 @@ function createCardElement(item) {
 function renderFeed() {
   feedGrid.innerHTML = '';
   updateAvailableTags();
-  entries.forEach(item => feedGrid.appendChild(createCardElement(item)));
+  
+  const fragment = document.createDocumentFragment();
+  entries.forEach(item => fragment.appendChild(createCardElement(item)));
+  feedGrid.appendChild(fragment);
 
   renderTags(); 
   renderSearchTags(); 
@@ -818,7 +860,6 @@ function openDetailSheet(item, preloadedSrc = null) {
     let sheetImgSource = item.image;
     let sheetThumbSource = item.thumb || preloadedSrc || sheetImgSource;
     
-    // Fix existing Dropbox links
     if (sheetImgSource && sheetImgSource.includes('dropbox.com')) {
       sheetImgSource = sheetImgSource.replace('www.dropbox.com', 'dl.dropboxusercontent.com')
                                      .replace('?raw=1', '')
@@ -830,14 +871,16 @@ function openDetailSheet(item, preloadedSrc = null) {
                                          .replace('?dl=0', '');
     }
     
-    // Progressive Loading UI (Blurry thumbnail instantly loads, High-Res fades in smoothly)
+    const isManualUrl = sheetThumbSource === sheetImgSource;
+    const applyBlur = item.thumb && !isManualUrl;
+    
     imgHtml = `
       <div style="margin-bottom: 20px; width: 100%; display: flex; justify-content: center;">
         <div style="position: relative; border-radius: var(--rounded-xl); overflow: hidden; transform: translateZ(0); -webkit-mask-image: -webkit-radial-gradient(white, black); display: inline-block; background-color: var(--surface-container-low); max-width: 100%;">
           
-          <img src="${sheetThumbSource}" alt="" onerror="this.style.display='none'" style="display: block; max-height: 40vh; max-width: 100%; width: auto; height: auto; filter: ${item.thumb ? 'blur(10px)' : 'none'}; transform: ${item.thumb ? 'scale(1.05)' : 'none'};" />
+          <img src="${sheetThumbSource}" alt="" decoding="sync" onerror="this.style.display='none'" style="display: block; max-height: 40vh; max-width: 100%; width: auto; height: auto; filter: ${applyBlur ? 'blur(10px)' : 'none'}; transform: ${applyBlur ? 'scale(1.05)' : 'none'}; transition: filter 0.3s, transform 0.3s;" />
           
-          ${item.thumb ? `<img src="${sheetImgSource}" alt="" onload="this.style.opacity='1'" style="position: absolute; top: 0; left: 0; display: block; width: 100%; height: 100%; object-fit: inherit; opacity: 0; transition: opacity 0.5s ease-in-out;" />` : ''}
+          ${applyBlur ? `<img src="${sheetImgSource}" alt="" fetchpriority="high" decoding="async" onload="this.style.opacity='1'; this.previousElementSibling.style.filter='none'; this.previousElementSibling.style.transform='none';" onerror="this.previousElementSibling.style.filter='none'; this.previousElementSibling.style.transform='none'; this.style.display='none';" style="position: absolute; top: 0; left: 0; display: block; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity 0.5s ease-in-out;" />` : ''}
           
         </div>
       </div>
@@ -884,7 +927,6 @@ function openDetailSheet(item, preloadedSrc = null) {
       if (entry && entry.checklist) {
         entry.checklist[idx].checked = e.target.checked;
         
-        // Update Sheet styling
         const span = e.target.nextElementSibling;
         if (e.target.checked) {
           span.style.textDecoration = 'line-through';
@@ -964,10 +1006,12 @@ function startEditMode(id) {
   
   if (entry.isList) {
     isListMode = true;
-    addDescription.value = entry.checklist ? entry.checklist.map(c => c.text).join('\n') : '';
+    currentListItems = entry.checklist && entry.checklist.length > 0 ? entry.checklist.map(c => c.text) : [''];
+    addDescription.value = '';
   } else {
     isListMode = false;
     addDescription.value = entry.description || '';
+    currentListItems = [''];
   }
   updateListButtonUI();
   
@@ -1028,6 +1072,9 @@ let isListMode = false;
 
 const addTitle = document.getElementById('add-title');
 const addDescription = document.getElementById('add-description');
+const addListContainer = document.getElementById('add-list-container');
+let currentListItems = [''];
+
 const addLink = document.getElementById('add-link');
 const addAnchor = document.getElementById('add-anchor');
 const btnShowAnchor = document.getElementById('btn-show-anchor');
@@ -1046,18 +1093,94 @@ if (btnToggleList) {
   });
 }
 
+function renderListBuilder() {
+  if (!addListContainer) return;
+  addListContainer.innerHTML = '';
+  
+  currentListItems.forEach((itemText, index) => {
+    const row = document.createElement('div');
+    row.style.cssText = 'display: flex; gap: 12px; align-items: stretch; width: 100%;';
+    
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.value = itemText;
+    input.placeholder = 'List item...';
+    input.className = 'font-body-md';
+    input.style.cssText = 'flex: 1; background-color: var(--surface-container-highest); border: 1px solid transparent; border-radius: var(--rounded-lg); padding: 16px; color: var(--on-surface); outline: none; transition: all 0.2s;';
+    input.onfocus = () => input.style.borderColor = 'var(--primary)';
+    input.onblur = () => input.style.borderColor = 'transparent';
+    
+    input.addEventListener('input', (e) => {
+      currentListItems[index] = e.target.value;
+      renderAddPreview();
+    });
+
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        if (index === currentListItems.length - 1) {
+          row.querySelector('button').click();
+        } else {
+          const allInputs = addListContainer.querySelectorAll('input[type="text"]');
+          if (allInputs[index + 1]) allInputs[index + 1].focus();
+        }
+      }
+    });
+
+    row.appendChild(input);
+
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'font-label-sm';
+    btn.style.cssText = 'display: flex; align-items: center; justify-content: center; background-color: var(--surface-container-highest); border-radius: var(--rounded-lg); padding: 0 20px; color: var(--on-surface); cursor: pointer; transition: background-color 0.2s; flex-shrink: 0; border: none;';
+    btn.onmouseover = () => btn.style.backgroundColor = 'var(--surface-variant)';
+    btn.onmouseout = () => btn.style.backgroundColor = 'var(--surface-container-highest)';
+    
+    if (index === currentListItems.length - 1) {
+      btn.innerHTML = '<span class="material-symbols-outlined">add</span>';
+      btn.onclick = () => {
+        currentListItems.push('');
+        renderListBuilder();
+        setTimeout(() => {
+          const inputs = addListContainer.querySelectorAll('input[type="text"]');
+          if (inputs.length > 0) inputs[inputs.length - 1].focus();
+        }, 50);
+      };
+    } else {
+      btn.innerHTML = '<span class="material-symbols-outlined">remove</span>';
+      btn.onclick = () => {
+        currentListItems.splice(index, 1);
+        renderListBuilder();
+        renderAddPreview();
+      };
+    }
+    
+    row.appendChild(btn);
+    addListContainer.appendChild(row);
+  });
+}
+
 function updateListButtonUI() {
   if (!btnToggleList) return;
   if (isListMode) {
     btnToggleList.style.backgroundColor = 'var(--primary)';
     btnToggleList.style.color = 'var(--on-primary)';
     btnToggleList.style.borderColor = 'var(--primary)';
-    addDescription.placeholder = "Enter list items (one per line)...";
+    if (addDescription) addDescription.style.display = 'none';
+    if (addListContainer) {
+        addListContainer.style.display = 'flex';
+        if (currentListItems.length === 0) currentListItems = [''];
+        renderListBuilder();
+    }
   } else {
     btnToggleList.style.backgroundColor = 'var(--surface-container-low)';
     btnToggleList.style.color = 'var(--on-surface-variant)';
     btnToggleList.style.borderColor = 'var(--outline-variant)';
-    addDescription.placeholder = "Description (optional)...";
+    if (addDescription) {
+        addDescription.style.display = 'block';
+        addDescription.placeholder = "Description (optional)...";
+    }
+    if (addListContainer) addListContainer.style.display = 'none';
   }
 }
 
@@ -1075,7 +1198,6 @@ function renderAddPreview() {
   const displayLinkText = addAnchor.value.trim() || link;
   let html = '';
 
-  // Use the ultra-fast thumb URL for the add preview to save memory
   let previewImgSource = addThumbUrl || addImageUrl;
 
   if (!previewImgSource) {
@@ -1252,7 +1374,7 @@ if (addAnchor) addAnchor.addEventListener('input', renderAddPreview);
 
 addImage.addEventListener('input', (e) => {
   addImageUrl = e.target.value;
-  addThumbUrl = addImageUrl; // Fallback to same URL if typed manually
+  addThumbUrl = addImageUrl; 
   pendingImageFile = null;
   pendingThumbFile = null;
   if (addImageUrl) {
@@ -1267,7 +1389,6 @@ addImage.addEventListener('input', (e) => {
   }
 });
 
-// Helper function to dynamically compress images
 function compressImage(file, maxWidth = 1200, quality = 0.8, prefix = "img") {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -1320,9 +1441,7 @@ addImageFile.addEventListener('change', async (e) => {
     authStatus.style.display = 'block';
 
     try {
-      // 1. Generate High-Res version for Detail Sheet
       const full = await compressImage(file, 1600, 0.85, "full");
-      // 2. Generate Ultra-Fast Thumbnail for Home Feed
       const thumb = await compressImage(file, 400, 0.6, "thumb");
       
       pendingImageFile = full.file;
@@ -1354,7 +1473,6 @@ btnSaveEntry.addEventListener('click', async () => {
   let finalThumbUrl = addThumbUrl;
   let successMessage = ''; 
   
-  // Format checklist if active mode
   let finalChecklist = [];
   let oldChecklist = [];
   
@@ -1365,7 +1483,14 @@ btnSaveEntry.addEventListener('click', async () => {
     }
   }
   
-  if (isListMode && addDescription.value.trim()) {
+  if (isListMode) {
+    const lines = currentListItems.filter(l => l.trim() !== '');
+    finalChecklist = lines.map(line => {
+      const text = line.trim();
+      const existing = oldChecklist.find(c => c.text === text);
+      return { text: text, checked: existing ? existing.checked : false };
+    });
+  } else if (addDescription.value.trim()) {
     const lines = addDescription.value.split('\n').filter(l => l.trim() !== '');
     finalChecklist = lines.map(line => {
       const text = line.trim();
@@ -1375,7 +1500,6 @@ btnSaveEntry.addEventListener('click', async () => {
   }
 
   try {
-    // Concurrently upload both images to Dropbox to save time
     if (pendingImageFile && pendingThumbFile) {
       const [fullUrlRes, thumbUrlRes] = await Promise.all([
         uploadImageToDropbox(pendingImageFile),
@@ -1430,6 +1554,7 @@ btnSaveEntry.addEventListener('click', async () => {
     pendingImageFile = null; pendingThumbFile = null; 
     addTags = []; editingId = null;
     isListMode = false;
+    currentListItems = [''];
     updateListButtonUI();
     btnSaveEntry.textContent = 'Save Post';
     
@@ -1452,6 +1577,7 @@ btnSaveEntry.addEventListener('click', async () => {
 
 renderAddPreview();
 renderTags();
+renderListBuilder();
 
 // --- Bind Global Events ---
 let lastWindowWidth = window.innerWidth;
