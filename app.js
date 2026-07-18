@@ -1101,19 +1101,12 @@ function renderListBuilder() {
     const row = document.createElement('div');
     row.style.cssText = 'display: flex; gap: 12px; align-items: stretch; width: 100%;';
     
-    const inputWrapper = document.createElement('div');
-    inputWrapper.style.cssText = 'position: relative; flex: 1; min-width: 0; display: flex;';
-    
-    const iconWrapper = document.createElement('div');
-    iconWrapper.style.cssText = 'position: absolute; top: 0; bottom: 0; left: 0; padding-left: 16px; display: flex; align-items: center; pointer-events: none;';
-    iconWrapper.innerHTML = '<span class="material-symbols-outlined" style="color: var(--outline-variant); font-size: 20px;">check_box_outline_blank</span>';
-    
     const input = document.createElement('input');
     input.type = 'text';
     input.value = itemText;
     input.placeholder = 'List item...';
     input.className = 'font-body-md';
-    input.style.cssText = 'width: 100%; background-color: var(--surface-container-highest); border: 1px solid transparent; border-radius: var(--rounded-lg); padding: 16px 16px 16px 48px; color: var(--on-surface); outline: none; transition: all 0.2s;';
+    input.style.cssText = 'flex: 1; min-width: 0; background-color: var(--surface-container-highest); border: 1px solid transparent; border-radius: var(--rounded-lg); padding: 16px; color: var(--on-surface); outline: none; transition: all 0.2s;';
     input.onfocus = () => input.style.borderColor = 'var(--primary)';
     input.onblur = () => input.style.borderColor = 'transparent';
     
@@ -1134,14 +1127,12 @@ function renderListBuilder() {
       }
     });
 
-    inputWrapper.appendChild(iconWrapper);
-    inputWrapper.appendChild(input);
-    row.appendChild(inputWrapper);
+    row.appendChild(input);
 
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'font-label-sm';
-    btn.style.cssText = 'display: flex; align-items: center; justify-content: center; background-color: var(--surface-container-highest); border-radius: var(--rounded-lg); padding: 0 20px; color: var(--on-surface); cursor: pointer; transition: background-color 0.2s; flex-shrink: 0; border: none;';
+    btn.style.cssText = 'display: flex; align-items: center; justify-content: center; background-color: var(--surface-container-highest); border-radius: var(--rounded-lg); padding: 0 16px; color: var(--on-surface); cursor: pointer; transition: background-color 0.2s; flex-shrink: 0; border: none;';
     btn.onmouseover = () => btn.style.backgroundColor = 'var(--surface-variant)';
     btn.onmouseout = () => btn.style.backgroundColor = 'var(--surface-container-highest)';
     
