@@ -170,12 +170,9 @@
         </div>
 
         <div style="display: flex; gap: 12px; width: 100%;">
-          <div style="position: relative; flex: 1;">
-            <div style="position: absolute; top: 0; bottom: 0; left: 0; padding-left: 16px; display: flex; align-items: center; pointer-events: none;">
-              <span class="material-symbols-outlined" style="color: var(--outline-variant); font-size: 20px;">link</span>
-            </div>
+          <div style="flex: 1;">
             <input type="text" id="add-link" placeholder="Paste a link..." class="font-body-md"
-              style="width: 100%; background-color: var(--surface-container-highest); border: 1px solid transparent; border-radius: var(--rounded-lg); padding: 16px 16px 16px 48px; color: var(--on-surface); outline: none; transition: all 0.2s;"
+              style="width: 100%; background-color: var(--surface-container-highest); border: 1px solid transparent; border-radius: var(--rounded-lg); padding: 16px; color: var(--on-surface); outline: none; transition: all 0.2s;"
               onfocus="this.style.borderColor='var(--primary)';"
               onblur="this.style.borderColor='transparent';" />
           </div>
@@ -187,24 +184,18 @@
             <span class="material-symbols-outlined">text_fields</span>
           </button>
           
-          <div id="anchor-container" style="display: none; position: relative; flex: 1;">
-            <div style="position: absolute; top: 0; bottom: 0; left: 0; padding-left: 16px; display: flex; align-items: center; pointer-events: none;">
-              <span class="material-symbols-outlined" style="color: var(--outline-variant); font-size: 20px;">title</span>
-            </div>
+          <div id="anchor-container" style="display: none; flex: 1;">
             <input type="text" id="add-anchor" placeholder="Anchor text..." class="font-body-md"
-              style="width: 100%; background-color: var(--surface-container-highest); border: 1px solid transparent; border-radius: var(--rounded-lg); padding: 16px 16px 16px 48px; color: var(--on-surface); outline: none; transition: all 0.2s;"
+              style="width: 100%; background-color: var(--surface-container-highest); border: 1px solid transparent; border-radius: var(--rounded-lg); padding: 16px; color: var(--on-surface); outline: none; transition: all 0.2s;"
               onfocus="this.style.borderColor='var(--primary)';"
               onblur="this.style.borderColor='transparent';" />
           </div>
         </div>
 
         <div style="display: flex; gap: 12px;">
-          <div style="position: relative; flex: 1;">
-            <div style="position: absolute; top: 0; bottom: 0; left: 0; padding-left: 16px; display: flex; align-items: center; pointer-events: none;">
-              <span class="material-symbols-outlined" style="color: var(--outline-variant); font-size: 20px;">image</span>
-            </div>
+          <div style="flex: 1;">
             <input type="text" id="add-image" placeholder="Image URL..." class="font-body-md"
-              style="width: 100%; background-color: var(--surface-container-highest); border: 1px solid transparent; border-radius: var(--rounded-lg); padding: 16px 16px 16px 48px; color: var(--on-surface); outline: none; transition: all 0.2s;"
+              style="width: 100%; background-color: var(--surface-container-highest); border: 1px solid transparent; border-radius: var(--rounded-lg); padding: 16px; color: var(--on-surface); outline: none; transition: all 0.2s;"
               onfocus="this.style.borderColor='var(--primary)';"
               onblur="this.style.borderColor='transparent';" />
           </div>
@@ -230,7 +221,7 @@
     <div id="selection-bar"
       style="display: none; transform: translateY(200%); transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1); position: fixed; bottom: 32px; left: 0; right: 0; justify-content: center; align-items: center; z-index: 99999;">
       <div class="shadow-nav"
-        style="position: relative; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 16px; border-radius: var(--rounded-full); min-width: 280px; background-color: rgba(242, 240, 235, 0.95); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.5);">
+        style="position: relative; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 16px; border-radius: var(--rounded-full); min-width: 280px; backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);">
         <span class="font-label-md" style="color: var(--on-surface); margin-left: 8px;" id="selection-count">0 Selected</span>
         <div style="display: flex; align-items: center; gap: 12px;">
           <button id="btn-edit" class="font-label-sm"
@@ -249,7 +240,7 @@
     <div id="tag-selection-bar"
       style="display: none; transform: translateY(200%); transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1); position: fixed; bottom: 32px; left: 0; right: 0; justify-content: center; align-items: center; z-index: 99999;">
       <div class="shadow-nav"
-        style="position: relative; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 16px; border-radius: var(--rounded-full); min-width: 280px; background-color: rgba(242, 240, 235, 0.95); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.5);">
+        style="position: relative; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 16px; border-radius: var(--rounded-full); min-width: 280px; backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);">
         <span class="font-label-md" style="color: var(--on-surface); margin-left: 8px;" id="tag-selection-count">0 Selected</span>
         <div style="display: flex; align-items: center; gap: 12px;">
           <button id="btn-edit-tag" class="font-label-sm"
@@ -268,7 +259,7 @@
     <div id="bottom-nav"
       style="position: fixed; transform: translateY(0); transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1); bottom: 32px; left: 0; right: 0; display: flex; justify-content: center; align-items: center; z-index: 99999;">
       <nav id="nav-container"
-        style="position: relative; display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 12px 16px; border-radius: var(--rounded-full); min-width: 200px; background-color: rgba(242, 240, 235, 0.65); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); border: 1px solid rgba(255, 255, 255, 0.5); overflow: hidden;">
+        style="position: relative; display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 12px 16px; border-radius: var(--rounded-full); min-width: 200px; backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); overflow: hidden;">
         
         <div id="nav-toast" class="font-label-sm" style="position: absolute; inset: 0; background-color: transparent; color: var(--on-surface); display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: opacity 0.3s ease; z-index: 10;"></div>
 
