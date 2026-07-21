@@ -29,6 +29,11 @@ function escapeHtml(str) {
   return div.innerHTML;
 }
 
+function sanitizeUrl(url) {
+  if (!url) return '';
+  return url.replace(/["<>]/g, '');
+}
+
 function debounce(fn, delay) {
   let timer;
   return function(...args) {
@@ -195,6 +200,18 @@ window.onload = async function () {
     return;
   }
 
+  // Load cached entries immediately for instant offline feed
+  try {
+    const cached = localStorage.getItem('onespot_cached_entries');
+    if (cached) {
+      entries = JSON.parse(cached);
+      if (!Array.isArray(entries)) entries = [];
+      if (entries.length > 0) {
+        renderFeed();
+      }
+    }
+  } catch(_) {}
+
   dbxAuth = new Dropbox.DropboxAuth({
     clientId: CLIENT_ID,
   });
@@ -314,6 +331,8 @@ async function initializeDropbox() {
   }
 
   authOverlay.style.display = 'none';
+  // Cache entries for offline viewing
+  try { localStorage.setItem('onespot_cached_entries', JSON.stringify(entries)); } catch(_) {}
   renderFeed();
 }
 
@@ -344,9 +363,17 @@ async function saveDataToDropbox(retrying = false) {
         }
       } catch (_) { /* fall through */ }
     }
+    // Offline fallback: save locally and retry when online
+    if (!navigator.onLine) {
+      try { localStorage.setItem('onespot_cached_entries', JSON.stringify(entries)); } catch(_) {}
+      showToast('Saved offline — will sync when back online.');
+      return; // don't throw, the data is safe locally
+    }
     showToast('Failed to save data.');
     throw e;
   }
+  // Update offline cache on successful save
+  try { localStorage.setItem('onespot_cached_entries', JSON.stringify(entries)); } catch(_) {}
 }
 
 async function uploadImageToDropbox(file) {
@@ -617,8 +644,8 @@ function createCardElement(item) {
   const itemDiv = document.createElement('div');
   itemDiv.className = 'masonry-item';
 
-  let imgSource = normalizeDropboxUrl(item.thumb || item.image);
-  let fullSource = normalizeDropboxUrl(item.image);
+  let imgSource = sanitizeUrl(normalizeDropboxUrl(item.thumb || item.image));
+  let fullSource = sanitizeUrl(normalizeDropboxUrl(item.image));
 
   const article = document.createElement('article');
   article.dataset.id = item.id;
@@ -657,6 +684,7 @@ function createCardElement(item) {
         <h2 class="font-headline-md" style="color:var(--on-background);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;text-overflow:ellipsis;word-break:break-word;font-size:14px;line-height:1.2;">${safeTitle}</h2>
       </div>`;
 
+      // Preload is still per-card but uses { once: true } so they self-remove
       const preloadHighRes = () => {
         if (!fullSource || imgSource === fullSource) return;
         if (!article.dataset.preloaded) {
@@ -668,51 +696,6 @@ function createCardElement(item) {
       article.addEventListener('mouseenter', preloadHighRes, { once: true });
       article.addEventListener('touchstart', preloadHighRes, { once: true, passive: true });
   }
-
-  let pressTimer = null;
-  let startY = 0;
-  let startX = 0;
-
-  article.addEventListener('contextmenu', (e) => e.preventDefault());
-
-  article.addEventListener('pointerdown', (e) => {
-    if (e.pointerType === 'mouse' && e.button !== 0) return;
-    startY = e.clientY;
-    startX = e.clientX;
-    
-    if (selectedIds.length === 0) {
-      pressTimer = setTimeout(() => {
-        selectedIds = [item.id];
-        lastSelectionTime = Date.now();
-        if (navigator.vibrate) navigator.vibrate(50);
-        updateSelectionState();
-      }, 500);
-    }
-  });
-
-  article.addEventListener('pointermove', (e) => {
-    if (Math.abs(e.clientY - startY) > 10 || Math.abs(e.clientX - startX) > 10) clearTimeout(pressTimer);
-  });
-
-  article.addEventListener('pointerup', () => clearTimeout(pressTimer));
-  article.addEventListener('pointercancel', () => clearTimeout(pressTimer));
-
-  article.addEventListener('click', (e) => {
-    e.preventDefault(); 
-    if (selectedIds.length > 0) {
-      if (Date.now() - lastSelectionTime < 300) return;
-      if (selectedIds.includes(item.id)) selectedIds = selectedIds.filter(id => id !== item.id);
-      else selectedIds.push(item.id);
-      updateSelectionState();
-    } else {
-      const link = e.target.closest('a');
-      if (link) {
-        window.open(link.href, link.target || '_blank');
-        return;
-      }
-      openDetailSheet(item, imgSource);
-    }
-  });
 
   itemDiv.appendChild(article);
   
@@ -765,6 +748,8 @@ function getCardObserver() {
 }
 
 function renderFeed() {
+  // Disconnect old observer to prevent memory leaks from orphaned DOM refs
+  if (_cardObserver) { _cardObserver.disconnect(); }
   feedGrid.innerHTML = '';
   updateAvailableTags();
   
@@ -796,6 +781,67 @@ function renderFeed() {
   applySelectionStyles();
   setMasonrySpans();
 }
+
+// --- Event Delegation on Feed Grid ---
+(function() {
+  let pressTimer = null;
+  let startY = 0;
+  let startX = 0;
+
+  feedGrid.addEventListener('contextmenu', e => {
+    if (e.target.closest('article[data-id]')) e.preventDefault();
+  });
+
+  feedGrid.addEventListener('pointerdown', e => {
+    const article = e.target.closest('article[data-id]');
+    if (!article) return;
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    startY = e.clientY;
+    startX = e.clientX;
+    
+    if (selectedIds.length === 0) {
+      const itemId = article.dataset.id;
+      pressTimer = setTimeout(() => {
+        selectedIds = [itemId];
+        lastSelectionTime = Date.now();
+        if (navigator.vibrate) navigator.vibrate(50);
+        updateSelectionState();
+      }, 500);
+    }
+  });
+
+  feedGrid.addEventListener('pointermove', e => {
+    if (Math.abs(e.clientY - startY) > 10 || Math.abs(e.clientX - startX) > 10) clearTimeout(pressTimer);
+  });
+
+  feedGrid.addEventListener('pointerup', () => clearTimeout(pressTimer));
+  feedGrid.addEventListener('pointercancel', () => clearTimeout(pressTimer));
+
+  feedGrid.addEventListener('click', e => {
+    const article = e.target.closest('article[data-id]');
+    if (!article) return;
+    e.preventDefault();
+    const itemId = article.dataset.id;
+    
+    if (selectedIds.length > 0) {
+      if (Date.now() - lastSelectionTime < 300) return;
+      if (selectedIds.includes(itemId)) selectedIds = selectedIds.filter(id => id !== itemId);
+      else selectedIds.push(itemId);
+      updateSelectionState();
+    } else {
+      const link = e.target.closest('a');
+      if (link) {
+        window.open(link.href, link.target || '_blank');
+        return;
+      }
+      const item = entries.find(en => en.id === itemId);
+      if (item) {
+        const imgSource = sanitizeUrl(normalizeDropboxUrl(item.thumb || item.image));
+        openDetailSheet(item, imgSource);
+      }
+    }
+  });
+})();
 
 function renderSearchFeed() {
   const query = searchQuery.toLowerCase();
@@ -988,8 +1034,8 @@ function openDetailSheet(item, preloadedSrc = null) {
 
   let imgHtml = '';
   if (item.image) {
-    let sheetImgSource = normalizeDropboxUrl(item.image);
-    let sheetThumbSource = normalizeDropboxUrl(item.thumb || preloadedSrc || item.image);
+    let sheetImgSource = sanitizeUrl(normalizeDropboxUrl(item.image));
+    let sheetThumbSource = sanitizeUrl(normalizeDropboxUrl(item.thumb || preloadedSrc || item.image));
     
     const isManualUrl = sheetThumbSource === sheetImgSource;
     const applyBlur = item.thumb && !isManualUrl;
@@ -1366,7 +1412,11 @@ function renderListBuilder() {
         renderListBuilder();
         setTimeout(() => {
           const inputs = addListContainer.querySelectorAll('textarea');
-          if (inputs.length > 0) inputs[inputs.length - 1].focus();
+          if (inputs.length > 0) {
+            const lastInput = inputs[inputs.length - 1];
+            lastInput.focus();
+            lastInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
         }, 50);
       };
     } else {
@@ -1431,17 +1481,19 @@ function renderAddPreview() {
   const text = addTitle.value || (editingId ? 'Edit Preview' : 'Preview');
   const link = addLink.value;
   const displayLinkText = addAnchor.value.trim() || link;
+  const safeText = escapeHtml(text);
+  const safeLinkText = escapeHtml(displayLinkText);
   let html = '';
 
-  let previewImgSource = addThumbUrl || addImageUrl;
+  let previewImgSource = sanitizeUrl(addThumbUrl || addImageUrl);
 
   if (!previewImgSource) {
     html = `
       <div style="max-width: 240px; margin: 0 auto;">
         <article class="shadow-ambient" style="position: relative; background-color: var(--surface-container-low); color: var(--on-surface); border-radius: var(--rounded-xl); padding: var(--spacing-md); border: 1px solid var(--tertiary-fixed-dim); transform: translateZ(0); -webkit-mask-image: -webkit-radial-gradient(white, black);">
           <div>
-            <h2 class="font-headline-md" style="line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; text-overflow: ellipsis; word-break: break-word; font-size: clamp(14px, 4.5vw, 24px);">${text}</h2>
-            ${link ? `<a href="https://${link.replace(/^https?:\/\//, '')}" target="_blank" class="font-body-md" style="display: block; margin-top: var(--spacing-sm); color: var(--outline); word-break: break-all; text-decoration: underline; pointer-events: none;">${displayLinkText}</a>` : ''}
+            <h2 class="font-headline-md" style="line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; text-overflow: ellipsis; word-break: break-word; font-size: clamp(14px, 4.5vw, 24px);">${safeText}</h2>
+            ${link ? `<a href="https://${link.replace(/^https?:\/\//, '')}" target="_blank" class="font-body-md" style="display: block; margin-top: var(--spacing-sm); color: var(--outline); word-break: break-all; text-decoration: underline; pointer-events: none;">${safeLinkText}</a>` : ''}
           </div>
         </article>
       </div>
@@ -1459,11 +1511,11 @@ function renderAddPreview() {
           <div class="shadow-ambient" style="position: relative; width: 100%; padding-bottom: ${addImageAspectRatio}; background-color: var(--surface-container-highest); overflow: hidden; border-radius: var(--rounded-xl);">
             <img src="${previewImgSource}" crossorigin="anonymous" onload="this.style.opacity='1'" onerror="if(!this.dataset.retried){this.dataset.retried='1';this.removeAttribute('crossorigin');this.src=this.src}else{this.style.opacity='0'}" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; border-radius: var(--rounded-xl); transition: opacity 0.3s; opacity: 0;" />
             <div style="position: absolute; bottom: 0; left: 0; width: 100%; padding: 32px 12px 12px; display: flex; flex-direction: column; gap: 6px; z-index: 2;">
-              ${link ? `<div class="font-body-md" style="display: flex; align-items: center; gap: 4px; color: rgba(255,255,255,0.95); font-size: 12px; text-shadow: 0 1px 4px rgba(0,0,0,0.8), 0 0 10px rgba(0,0,0,0.5);"><span class="material-symbols-outlined" style="font-size: 14px;">link</span>${displayLinkText.replace(/^https?:\/\//, '')}</div>` : ''}
+              ${link ? `<div class="font-body-md" style="display: flex; align-items: center; gap: 4px; color: rgba(255,255,255,0.95); font-size: 12px; text-shadow: 0 1px 4px rgba(0,0,0,0.8), 0 0 10px rgba(0,0,0,0.5);"><span class="material-symbols-outlined" style="font-size: 14px;">link</span>${safeLinkText.replace(/^https?:\/\//, '')}</div>` : ''}
             </div>
           </div>
           <div style="padding: 6px 8px 0; display: flex; flex-direction: column;">
-            <h2 class="font-headline-md" style="color: var(--on-background); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; text-overflow: ellipsis; word-break: break-word; font-size: 14px; line-height: 1.2;">${text}</h2>
+            <h2 class="font-headline-md" style="color: var(--on-background); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; text-overflow: ellipsis; word-break: break-word; font-size: 14px; line-height: 1.2;">${safeText}</h2>
           </div>
         </article>
       </div>
@@ -2072,3 +2124,12 @@ document.getElementById('btn-logout').addEventListener('click', () => {
     if (spinner) spinner.remove();
   });
 })();
+
+// ─── Offline Post Queue: Auto-sync when back online ─────────────────────────
+ window.addEventListener('online', async () => {
+  if (!dbx) return;
+  try {
+    await saveDataToDropbox();
+    showToast('Synced offline changes!');
+  } catch(_) { /* will retry next time */ }
+});

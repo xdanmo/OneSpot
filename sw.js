@@ -1,4 +1,4 @@
-const CACHE_NAME = 'onespot-cache-v5'; // Bumped: full improvements batch
+const CACHE_NAME = 'onespot-cache-v6'; // Bumped: round 2 improvements
 const urlsToCache = [
   './',
   './index.html',
