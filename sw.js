@@ -1,4 +1,4 @@
-const CACHE_NAME = 'onespot-cache-v19'; // Bumped: fix nav bar visibility
+const CACHE_NAME = 'onespot-cache-v20'; // Bumped: completely remove nav bar hiding logic
 const urlsToCache = [
   './',
   './index.html',

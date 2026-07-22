@@ -428,12 +428,6 @@ function handleRoute(noAnimate = false) {
   const hasCode = window.location.search.includes('code=');
 
   if (!dbx && !hasCode) {
-    if (bottomNav) bottomNav.style.display = 'none';
-  } else {
-    if (bottomNav) bottomNav.style.display = 'flex';
-  }
-
-  if (!dbx && !hasCode) {
       if (typeof resetAuthUI === 'function') resetAuthUI();
   }
 
