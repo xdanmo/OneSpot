@@ -341,6 +341,7 @@ async function initializeDropbox() {
   authOverlay.style.display = 'none';
   // Cache entries for offline viewing
   try { localStorage.setItem('onespot_cached_entries', JSON.stringify(entries)); } catch(_) {}
+  handleRoute(true);
   renderFeed();
 }
 
