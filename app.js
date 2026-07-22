@@ -540,7 +540,7 @@ if (bottomNav) {
 const _masonryHeights = new WeakMap();
 let _masonryRafPending = false;
 
-function setMasonrySpans() {
+function setMasonrySpans() { if (!feedGrid) return;
   if (_masonryRafPending) return;
   _masonryRafPending = true;
   requestAnimationFrame(() => {
@@ -755,7 +755,7 @@ function getCardObserver() {
   return _cardObserver;
 }
 
-function renderFeed() {
+function renderFeed() { if (!feedGrid) return;
   // Disconnect old observer to prevent memory leaks from orphaned DOM refs
   if (_cardObserver) { _cardObserver.disconnect(); }
   feedGrid.innerHTML = '';
@@ -851,7 +851,7 @@ function renderFeed() {
   });
 })();
 
-function renderSearchFeed() {
+function renderSearchFeed() { if (!feedGrid) return;
   const query = searchQuery.toLowerCase();
   const items = feedGrid.querySelectorAll('.masonry-item');
   let visibleCount = 0;
@@ -896,7 +896,7 @@ function renderSearchFeed() {
   scheduleMasonryUpdate();
 }
 
-function applySelectionStyles() {
+function applySelectionStyles() { if (!feedGrid) return;
   const inSelectionMode = selectedIds.length > 0;
   document.querySelectorAll('article[data-id]').forEach(article => {
     const isSelected = selectedIds.includes(article.dataset.id);
