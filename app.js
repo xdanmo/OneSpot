@@ -958,10 +958,13 @@ function updateSelectionState(instant = false) {
       selectionBar.style.transform = 'translateY(200%)'; 
       
       setTimeout(() => {
-        selectionBar.style.display = 'none';
         bottomNav.style.transition = 'transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)';
         bottomNav.style.transform = 'translateY(0)'; 
         updateNavIndicator(window.location.hash.replace('#', '') || '/', true);
+      }, 50);
+
+      setTimeout(() => {
+        selectionBar.style.display = 'none';
       }, 400);
     }
   }
@@ -1006,10 +1009,13 @@ function updateTagSelectionState(instant = false) {
           tagSelectionBar.style.transform = 'translateY(200%)'; 
           
           setTimeout(() => {
-            tagSelectionBar.style.display = 'none';
             bottomNav.style.transition = 'transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)';
             bottomNav.style.transform = 'translateY(0)'; 
             updateNavIndicator(window.location.hash.replace('#', '') || '/', true);
+          }, 50);
+
+          setTimeout(() => {
+            tagSelectionBar.style.display = 'none';
           }, 400);
       }
     }
@@ -1918,12 +1924,21 @@ if (btnDelete) btnDelete.addEventListener('click', async () => {
     }
   });
 
-  if (authOverlay) authOverlay.style.display = 'flex';
-  if (authStatus) authStatus.textContent = 'Deleting...';
-  if (authStatus) authStatus.style.display = 'block';
+  const idsToDelete = [...selectedIds];
+  
+  // Animate items away seamlessly
+  idsToDelete.forEach(id => {
+    const el = document.getElementById(`post-${id}`);
+    if (el) {
+      el.style.transition = 'all 0.3s cubic-bezier(0.2, 0.8, 0.2, 1)';
+      el.style.opacity = '0';
+      el.style.transform = 'scale(0.8)';
+    }
+  });
 
-  entries = entries.filter(e => !selectedIds.includes(e.id));
+  entries = entries.filter(e => !idsToDelete.includes(e.id));
   selectedIds = [];
+  updateSelectionState(false); 
 
   try {
     await saveDataToDropbox();
@@ -1937,9 +1952,10 @@ if (btnDelete) btnDelete.addEventListener('click', async () => {
     showToast('Failed to delete posts.');
   }
 
-  if (authOverlay) authOverlay.style.display = 'none';
-  renderFeed();
-  updateSelectionState(true); 
+  // Wait for animation to finish before snapping the grid
+  setTimeout(() => {
+    renderFeed();
+  }, 300);
 });
 
 if (btnCloseSelection) btnCloseSelection.addEventListener('click', () => {
@@ -1974,7 +1990,7 @@ if (btnDeleteTag) {
     }
     
     if (authOverlay) authOverlay.style.display = 'none';
-    updateTagSelectionState(true);
+    updateTagSelectionState(false);
     renderSearchTags(); 
     renderSearchFeed();
   });
