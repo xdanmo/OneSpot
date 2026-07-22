@@ -452,7 +452,7 @@ function handleRoute(noAnimate = false) {
     updateTagSelectionState(true);
   }
 
-  window.scrollTo({ top: 0, behavior: 'instant' });
+  
 
   Object.values(views).forEach(v => {
     if (v) {
@@ -485,6 +485,7 @@ function handleRoute(noAnimate = false) {
   updateNavIndicator(hash, noAnimate);
   setMasonrySpans(); 
   setTimeout(setMasonrySpans, 50);
+  requestAnimationFrame(() => window.scrollTo({ top: 0, behavior: 'instant' }));
 }
 
 function updateNavIndicator(hash, noAnimate = false) {
