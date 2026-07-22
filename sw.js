@@ -1,4 +1,4 @@
-const CACHE_NAME = 'onespot-cache-v7'; // Bumped: refresh fixes for desktop and mobile
+const CACHE_NAME = 'onespot-cache-v8'; // Bumped: native browser refresh prevention
 const urlsToCache = [
   './',
   './index.html',

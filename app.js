@@ -2200,9 +2200,12 @@ async function triggerFeedRefresh() {
 
   homeView.addEventListener('touchmove', e => {
     if (e.touches && e.touches.length === 1) {
+      if (isPulling && e.touches[0].clientY - startY > 0 && getScrollTop() <= 0) {
+        if (e.cancelable) e.preventDefault();
+      }
       movePull(e.touches[0].clientY);
     }
-  }, { passive: true });
+  }, { passive: false });
 
   homeView.addEventListener('touchend', endPull, { passive: true });
   homeView.addEventListener('touchcancel', endPull, { passive: true });
