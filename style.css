@@ -602,7 +602,10 @@ input, textarea { font-family: inherit; }
   transition: all 0.2s;
   border: none;
   z-index: 2;
+  outline: none;
+  -webkit-tap-highlight-color: transparent;
 }
+.btn-inset:focus { outline: none; }
 .btn-inset:hover {
   background-color: var(--surface-variant);
   color: var(--on-surface);

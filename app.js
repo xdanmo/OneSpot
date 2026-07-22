@@ -2116,6 +2116,7 @@ async function triggerFeedRefresh() {
   // Desktop / Mobile: explicit refresh button in search bar
   if (btnRefreshFeed) {
     btnRefreshFeed.addEventListener('click', () => {
+      btnRefreshFeed.blur();
       window.scrollTo({ top: 0, behavior: 'smooth' });
       triggerFeedRefresh();
     });
