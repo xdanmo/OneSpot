@@ -193,10 +193,10 @@ function scheduleSave() {
 window.onload = async function () {
   handleRoute(true);
   if (window.location.protocol === 'file:') {
-    authStatus.style.display = 'block';
+    if (authStatus) authStatus.style.display = 'block';
     authStatus.textContent = 'This app needs to be served over http/https, not opened directly as a file. Run it through a local server or deploy it, then reload this page.';
-    btnLogin.style.display = 'none';
-    authOverlay.style.display = 'flex';
+    if (btnLogin) btnLogin.style.display = 'none';
+    if (authOverlay) authOverlay.style.display = 'flex';
     return;
   }
 
@@ -220,10 +220,10 @@ window.onload = async function () {
   const code = urlParams.get('code');
 
   if (code) {
-    authOverlay.style.display = 'flex';
-    authStatus.style.display = 'block';
+    if (authOverlay) authOverlay.style.display = 'flex';
+    if (authStatus) authStatus.style.display = 'block';
     authStatus.textContent = 'Completing login...';
-    btnLogin.style.display = 'none';
+    if (btnLogin) btnLogin.style.display = 'none';
 
     try {
       const codeVerifier = window.sessionStorage.getItem('codeVerifier');
@@ -272,7 +272,7 @@ window.onload = async function () {
 function resetAuthUI() {
   if (authStatus) authStatus.style.display = 'none';
   if (btnLogin) btnLogin.style.display = 'block';
-  if (authOverlay) authOverlay.style.display = 'flex';
+  if (authOverlay) if (authOverlay) authOverlay.style.display = 'flex';
 }
 
 if (btnLogin) {
@@ -288,10 +288,10 @@ if (btnLogin) {
 }
 
 async function initializeDropbox() {
-  authStatus.style.display = 'block';
-  authStatus.textContent = 'Syncing with Dropbox...';
-  btnLogin.style.display = 'none';
-  authOverlay.style.display = 'flex';
+  if (authStatus) authStatus.style.display = 'block';
+  if (authStatus) authStatus.textContent = 'Syncing with Dropbox...';
+  if (btnLogin) btnLogin.style.display = 'none';
+  if (authOverlay) authOverlay.style.display = 'flex';
 
   try {
     try {
@@ -338,7 +338,7 @@ async function initializeDropbox() {
     }
   }
 
-  authOverlay.style.display = 'none';
+  if (authOverlay) authOverlay.style.display = 'none';
   // Cache entries for offline viewing
   try { localStorage.setItem('onespot_cached_entries', JSON.stringify(entries)); } catch(_) {}
   handleRoute(true);
@@ -386,9 +386,9 @@ async function saveDataToDropbox(retrying = false) {
 }
 
 async function uploadImageToDropbox(file) {
-  authOverlay.style.display = 'flex';
+  if (authOverlay) authOverlay.style.display = 'flex';
   authStatus.textContent = 'Uploading image...';
-  authStatus.style.display = 'block';
+  if (authStatus) authStatus.style.display = 'block';
   await dbxAuth.checkAndRefreshAccessToken();
 
   const ext = file.name.split('.').pop();
@@ -399,7 +399,7 @@ async function uploadImageToDropbox(file) {
     const fileBuffer = await file.arrayBuffer();
     response = await dbx.filesUpload({ path: filePath, contents: fileBuffer });
   } catch (uploadError) {
-    authOverlay.style.display = 'none';
+    if (authOverlay) authOverlay.style.display = 'none';
     throw uploadError;
   }
     
@@ -408,14 +408,14 @@ async function uploadImageToDropbox(file) {
       path: response.result.path_display,
       settings: { requested_visibility: { '.tag': 'public' } }
     });
-    authOverlay.style.display = 'none';
+    if (authOverlay) authOverlay.style.display = 'none';
     // Return both the public URL and the internal Dropbox path for future cleanup
     return {
       url: linkRes.result.url.replace('www.dropbox.com', 'dl.dropboxusercontent.com').replace('?dl=0', ''),
       path: filePath
     };
   } catch (linkError) {
-    authOverlay.style.display = 'none';
+    if (authOverlay) authOverlay.style.display = 'none';
     throw linkError;
   }
 }
@@ -1725,9 +1725,9 @@ function compressImage(file, maxWidth = 1200, quality = 0.8, prefix = "img") {
 if (addImageFile) addImageFile.addEventListener('change', async (e) => {
   const file = e.target.files[0];
   if (file) {
-    authOverlay.style.display = 'flex';
+    if (authOverlay) authOverlay.style.display = 'flex';
     authStatus.textContent = 'Optimizing images...';
-    authStatus.style.display = 'block';
+    if (authStatus) authStatus.style.display = 'block';
 
     try {
       const full = await compressImage(file, 1600, 0.85, "full");
@@ -1746,7 +1746,7 @@ if (addImageFile) addImageFile.addEventListener('change', async (e) => {
       console.error("Compression failed:", err);
       showToast("Failed to optimize image.");
     } finally {
-      authOverlay.style.display = 'none';
+      if (authOverlay) authOverlay.style.display = 'none';
     }
   }
 });
@@ -1924,9 +1924,9 @@ if (btnDelete) btnDelete.addEventListener('click', async () => {
     }
   });
 
-  authOverlay.style.display = 'flex';
+  if (authOverlay) authOverlay.style.display = 'flex';
   authStatus.textContent = 'Deleting...';
-  authStatus.style.display = 'block';
+  if (authStatus) authStatus.style.display = 'block';
 
   entries = entries.filter(e => !selectedIds.includes(e.id));
   selectedIds = [];
@@ -1943,7 +1943,7 @@ if (btnDelete) btnDelete.addEventListener('click', async () => {
     showToast('Failed to delete posts.');
   }
 
-  authOverlay.style.display = 'none';
+  if (authOverlay) authOverlay.style.display = 'none';
   renderFeed();
   updateSelectionState(true); 
 });
@@ -1955,9 +1955,9 @@ if (btnCloseSelection) btnCloseSelection.addEventListener('click', () => {
 
 if (btnDeleteTag) {
   if (btnDeleteTag) btnDeleteTag.addEventListener('click', async () => {
-    authOverlay.style.display = 'flex';
+    if (authOverlay) authOverlay.style.display = 'flex';
     authStatus.textContent = 'Deleting tags...';
-    authStatus.style.display = 'block';
+    if (authStatus) authStatus.style.display = 'block';
 
     entries.forEach(entry => {
       if (entry.tags) {
@@ -1979,7 +1979,7 @@ if (btnDeleteTag) {
         showToast("Failed to delete tags.");
     }
     
-    authOverlay.style.display = 'none';
+    if (authOverlay) authOverlay.style.display = 'none';
     updateTagSelectionState(true);
     renderSearchTags(); 
     renderSearchFeed();
@@ -2001,9 +2001,9 @@ if (btnEditTag) {
     
     const trimmedNewTag = newTag.trim();
 
-    authOverlay.style.display = 'flex';
+    if (authOverlay) authOverlay.style.display = 'flex';
     authStatus.textContent = 'Updating tag...';
-    authStatus.style.display = 'block';
+    if (authStatus) authStatus.style.display = 'block';
 
     entries.forEach(entry => {
       if (entry.tags && entry.tags.includes(oldTag)) {
@@ -2029,7 +2029,7 @@ if (btnEditTag) {
         showToast('Failed to update tag.');
     }
     
-    authOverlay.style.display = 'none';
+    if (authOverlay) authOverlay.style.display = 'none';
     updateTagSelectionState(true);
     renderSearchTags(); 
     renderSearchFeed();
