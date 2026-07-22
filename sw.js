@@ -1,4 +1,4 @@
-const CACHE_NAME = 'onespot-cache-v12'; // Bumped: touch hover fix for refresh button
+const CACHE_NAME = 'onespot-cache-v13'; // Bumped: fix flash of home page on load
 const urlsToCache = [
   './',
   './index.html',

@@ -215,6 +215,7 @@ input, textarea { font-family: inherit; }
 }
 
 .feed-container {
+  display: none;
   padding-top: 12px;
   padding-bottom: 160px; /* Increased bottom padding for overall scrollability */
   padding-left: 12px;
