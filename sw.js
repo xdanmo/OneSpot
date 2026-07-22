@@ -1,4 +1,4 @@
-const CACHE_NAME = 'onespot-cache-v20'; // Bumped: completely remove nav bar hiding logic
+const CACHE_NAME = 'onespot-cache-v21'; // Bumped: fix login button
 const urlsToCache = [
   './',
   './index.html',
