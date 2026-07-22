@@ -1,4 +1,4 @@
-const CACHE_NAME = 'onespot-cache-v8'; // Bumped: native browser refresh prevention
+const CACHE_NAME = 'onespot-cache-v9'; // Bumped: browser native refresh restored, scroll fix
 const urlsToCache = [
   './',
   './index.html',
