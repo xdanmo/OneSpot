@@ -1,4 +1,4 @@
-const CACHE_NAME = 'onespot-cache-v17'; // Bumped: fix feed visibility on load
+const CACHE_NAME = 'onespot-cache-v18'; // Bumped: force update for feed visibility fix
 const urlsToCache = [
   './',
   './index.html',

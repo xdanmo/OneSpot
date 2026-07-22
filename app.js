@@ -191,6 +191,7 @@ function scheduleSave() {
 
 // --- Dropbox Initialization & PKCE Auth ---
 window.onload = async function () {
+  handleRoute(true);
   if (window.location.protocol === 'file:') {
     authStatus.style.display = 'block';
     authStatus.textContent = 'This app needs to be served over http/https, not opened directly as a file. Run it through a local server or deploy it, then reload this page.';
@@ -266,8 +267,6 @@ window.onload = async function () {
       if (typeof resetAuthUI === 'function') resetAuthUI();
     }
   }
-
-  handleRoute(true);
 };
 
 function resetAuthUI() {
@@ -342,7 +341,6 @@ async function initializeDropbox() {
   authOverlay.style.display = 'none';
   // Cache entries for offline viewing
   try { localStorage.setItem('onespot_cached_entries', JSON.stringify(entries)); } catch(_) {}
-  handleRoute(true);
   renderFeed();
 }
 
@@ -1895,6 +1893,23 @@ window.addEventListener('resize', () => {
     }
   }, 150);
 });
+
+// --- Service Worker Registration ---
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js').then(reg => {
+      console.log('ServiceWorker registered:', reg.scope);
+    }).catch(err => console.log('ServiceWorker error:', err));
+    
+    let refreshing = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (!refreshing) {
+        refreshing = true;
+        window.location.reload();
+      }
+    });
+  });
+}
 
 btnDelete.addEventListener('click', async () => {
   const count = selectedIds.length;
