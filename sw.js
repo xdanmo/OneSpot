@@ -1,4 +1,4 @@
-const CACHE_NAME = 'onespot-cache-v13'; // Bumped: fix flash of home page on load
+const CACHE_NAME = 'onespot-cache-v14'; // Bumped: fix iOS sticky scroll bug
 const urlsToCache = [
   './',
   './index.html',
