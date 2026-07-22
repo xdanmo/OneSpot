@@ -154,15 +154,15 @@ html, body {
   font-family: var(--font-family);
   background-color: var(--background);
   color: var(--on-background);
-  min-height: 100dvh;
-  overflow-x: hidden;
+  
+  
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 .app-container {
-  min-height: 100dvh;
+  
   position: relative;
 }
 
@@ -214,6 +214,7 @@ input, textarea { font-family: inherit; }
 }
 
 .feed-container {
+  touch-action: pan-y;
   display: none;
   padding-top: 12px;
   padding-bottom: 160px; /* Increased bottom padding for overall scrollability */
@@ -227,6 +228,7 @@ input, textarea { font-family: inherit; }
 
 @media (min-width: 600px) {
   .feed-container {
+  touch-action: pan-y;
     padding-top: 16px;
     padding-left: 16px;
     padding-right: 16px;
@@ -484,6 +486,7 @@ input, textarea { font-family: inherit; }
 
 /* ─── View Containers ────────────────────────────────────────────────────── */
 .view-container {
+  touch-action: pan-y;
   display: none;
   padding-top: var(--spacing-xl);
   padding-bottom: 160px;
@@ -493,6 +496,7 @@ input, textarea { font-family: inherit; }
   transition: background-color 0.3s ease;
 }
 .view-container--add {
+  touch-action: pan-y;
   display: none;
   padding-top: var(--spacing-lg);
   max-width: 800px;
@@ -975,6 +979,7 @@ input, textarea { font-family: inherit; }
   border-color: var(--primary);
 }
 .tags-scroll {
+  touch-action: pan-x pan-y;
   max-width: 600px;
   margin: 0 auto 16px;
   display: flex;
