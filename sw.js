@@ -1,4 +1,4 @@
-const CACHE_NAME = 'onespot-cache-v15'; // Bumped: multi-page architecture
+const CACHE_NAME = 'onespot-cache-v16'; // Bumped: fix nav indicator on load
 const urlsToCache = [
   './',
   './index.html',

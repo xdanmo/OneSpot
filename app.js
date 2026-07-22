@@ -537,6 +537,13 @@ function updateNavIndicator(hash, noAnimate = false) {
   }
 }
 
+if (bottomNav) {
+  const ro = new ResizeObserver(() => {
+    updateNavIndicator(window.location.hash.replace('#', '') || '/', true);
+  });
+  ro.observe(bottomNav);
+}
+
 const _masonryHeights = new WeakMap();
 let _masonryRafPending = false;
 
