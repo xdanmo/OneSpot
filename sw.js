@@ -1,4 +1,4 @@
-const CACHE_NAME = 'onespot-cache-v10'; // Bumped: disabled browser drag-to-refresh
+const CACHE_NAME = 'onespot-cache-v11'; // Bumped: fix scroll lockout from overscroll-behavior
 const urlsToCache = [
   './',
   './index.html',
