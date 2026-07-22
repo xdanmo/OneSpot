@@ -1,4 +1,4 @@
-const CACHE_NAME = 'onespot-cache-v9'; // Bumped: browser native refresh restored, scroll fix
+const CACHE_NAME = 'onespot-cache-v10'; // Bumped: disabled browser drag-to-refresh
 const urlsToCache = [
   './',
   './index.html',
