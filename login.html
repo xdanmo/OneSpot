@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login - OneSpot</title>
+  <meta name="description" content="OneSpot — Save links, notes, images and checklists. All stored in your own Dropbox. Your data, your drive.">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#f7f6f2" id="meta-theme-color">
+  <script>
+    if (localStorage.getItem('onespot_theme') === 'dark') {
+      document.documentElement.setAttribute('data-theme', 'dark');
+      document.getElementById('meta-theme-color').setAttribute('content', '#121212');
+    }
+  </script>
+  <link rel="preconnect" href="https://dl.dropboxusercontent.com" crossorigin>
+  <link rel="dns-prefetch" href="https://dl.dropboxusercontent.com">
+  <link rel="icon" type="image/png" href="icon-192.png">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app-container">
+    <div id="auth-overlay" class="auth-overlay" style="display: flex;">
+      <h1 class="font-display" style="margin-bottom: var(--spacing-md);">OneSpot</h1>
+      <p class="font-body-lg" style="color: var(--on-surface-variant); margin-bottom: var(--spacing-xl);">Your data,
+        your drive.</p>
+      <button id="btn-login" class="font-label-sm shadow-ambient btn-primary" style="padding: 16px 32px; display: none;">Connect
+        Dropbox</button>
+      <p id="auth-status" class="font-label-sm" style="margin-top: var(--spacing-md); color: var(--on-surface-variant);">Initializing...</p>
+        
+      <div class="auth-overlay__footer">
+        <a href="privacy.html" class="font-label-sm auth-overlay__privacy">Privacy Policy</a>
+        <p class="font-label-sm" style="color: var(--on-surface-variant); opacity: 0.8; letter-spacing: 0.05em;">Created by Anmol Jaiswal</p>
+      </div>
+    </div>
+  </div>
+  <script src="dropbox-sdk.min.js" defer></script>
+  <script src="app.js" type="module"></script>
+</body>
+</html>

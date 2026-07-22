@@ -84,8 +84,7 @@ const tagSearchInput = document.getElementById('tag-search-input');
 const views = {
   '/': document.getElementById('view-home'),
   '/add': document.getElementById('view-add'),
-  '/profile': document.getElementById('view-profile'),
-  '/privacy': document.getElementById('view-privacy')
+  '/profile': document.getElementById('view-profile')
 };
 
 const navLinks = document.querySelectorAll('.nav-link');
@@ -235,23 +234,36 @@ window.onload = async function () {
       
       localStorage.setItem('onespot_dbx_refresh', response.result.refresh_token);
       
-      window.history.replaceState({}, document.title, window.location.pathname + window.location.hash);
-      
       dbx = new Dropbox.Dropbox({ auth: dbxAuth });
+      
+      if (window.location.pathname.endsWith('login.html')) {
+        window.location.href = 'index.html';
+        return;
+      }
+      
+      window.history.replaceState({}, document.title, window.location.pathname + window.location.hash);
       await initializeDropbox();
     } catch (error) {
       const detail = (error && error.error && error.error.error_summary) || (error && error.message) || '';
       showToast(detail ? `Login failed: ${detail}` : 'Login failed. Please try again.');
-      resetAuthUI();
+      if (resetAuthUI) resetAuthUI();
     }
   } else {
     const savedRefreshToken = localStorage.getItem('onespot_dbx_refresh');
     if (savedRefreshToken) {
       dbxAuth.setRefreshToken(savedRefreshToken);
       dbx = new Dropbox.Dropbox({ auth: dbxAuth });
+      if (window.location.pathname.endsWith('login.html')) {
+        window.location.href = 'index.html';
+        return;
+      }
       await initializeDropbox();
     } else {
-      resetAuthUI();
+      if (!window.location.pathname.endsWith('login.html') && !window.location.pathname.endsWith('privacy.html')) {
+        window.location.href = 'login.html';
+        return;
+      }
+      if (resetAuthUI) resetAuthUI();
     }
   }
 
@@ -260,24 +272,22 @@ window.onload = async function () {
 };
 
 function resetAuthUI() {
-  authStatus.style.display = 'none';
-  btnLogin.style.display = 'block';
-  if (window.location.hash !== '#/privacy') {
-    authOverlay.style.display = 'flex';
-  } else {
-    authOverlay.style.display = 'none';
-  }
+  if (authStatus) authStatus.style.display = 'none';
+  if (btnLogin) btnLogin.style.display = 'block';
+  if (authOverlay) authOverlay.style.display = 'flex';
 }
 
-btnLogin.onclick = async () => {
-  try {
-    const authUrl = await dbxAuth.getAuthenticationUrl(REDIRECT_URI, undefined, 'code', 'offline', undefined, undefined, true);
-    window.sessionStorage.setItem('codeVerifier', dbxAuth.getCodeVerifier());
-    window.location.href = authUrl;
-  } catch (error) {
-    showToast('Failed to start login process.');
-  }
-};
+if (btnLogin) {
+  btnLogin.onclick = async () => {
+    try {
+      const authUrl = await dbxAuth.getAuthenticationUrl(REDIRECT_URI, undefined, 'code', 'offline', undefined, undefined, true);
+      window.sessionStorage.setItem('codeVerifier', dbxAuth.getCodeVerifier());
+      window.location.href = authUrl;
+    } catch (error) {
+      showToast('Failed to start login process.');
+    }
+  };
+}
 
 async function initializeDropbox() {
   authStatus.style.display = 'block';
@@ -424,10 +434,8 @@ function handleRoute(noAnimate = false) {
     if (bottomNav) bottomNav.style.display = 'flex';
   }
 
-  if (hash === '/privacy') {
-      authOverlay.style.display = 'none';
-  } else if (!dbx && !hasCode) {
-      resetAuthUI();
+  if (!dbx && !hasCode) {
+      if (typeof resetAuthUI === 'function') resetAuthUI();
   }
 
   if (hash !== '/add' && editingId) {

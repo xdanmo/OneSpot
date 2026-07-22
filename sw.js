@@ -1,7 +1,9 @@
-const CACHE_NAME = 'onespot-cache-v14'; // Bumped: fix iOS sticky scroll bug
+const CACHE_NAME = 'onespot-cache-v15'; // Bumped: multi-page architecture
 const urlsToCache = [
   './',
   './index.html',
+  './login.html',
+  './privacy.html',
   './style.css',
   './app.js',
   './manifest.json',
