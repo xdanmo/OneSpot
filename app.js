@@ -881,19 +881,8 @@ function renderSearchFeed() {
     }
   });
 
-  let noResultsMsg = feedGrid.querySelector('.no-results-msg');
-  if (visibleCount === 0) {
-    if (!noResultsMsg) {
-      noResultsMsg = document.createElement('p');
-      noResultsMsg.className = 'no-results-msg font-body-md';
-      noResultsMsg.style.cssText = 'grid-column: 1 / -1; text-align: center; color: var(--outline); margin-top: 40px;';
-      noResultsMsg.textContent = 'No posts found.';
-      feedGrid.appendChild(noResultsMsg);
-    }
-    noResultsMsg.style.display = 'block';
-  } else if (noResultsMsg) {
-    noResultsMsg.style.display = 'none';
-  }
+  const noResultsMsg = feedGrid.querySelector('.no-results-msg');
+  if (noResultsMsg) noResultsMsg.remove();
 
   applySelectionStyles();
   scheduleMasonryUpdate();
