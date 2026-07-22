@@ -147,7 +147,7 @@ function updateThemeUI(theme) {
 updateThemeUI(savedTheme);
 
 if (btnThemeToggle) {
-  btnThemeToggle.addEventListener('click', () => {
+  if (btnThemeToggle) btnThemeToggle.addEventListener('click', () => {
     const currentTheme = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
     const newTheme = currentTheme === 'light' ? 'dark' : 'light';
     
@@ -629,14 +629,14 @@ function renderSearchTags() {
 }
 
 if (feedSearchInput) {
-  feedSearchInput.addEventListener('input', debounce((e) => {
+  if (feedSearchInput) feedSearchInput.addEventListener('input', debounce((e) => {
     searchQuery = e.target.value.toLowerCase().trim();
     renderSearchFeed();
   }, 220));
 }
 
 if (tagSearchInput) {
-  tagSearchInput.addEventListener('input', (e) => {
+  if (tagSearchInput) tagSearchInput.addEventListener('input', (e) => {
     tagSearchQuery = e.target.value.toLowerCase().trim();
     renderSearchTags();
   });
@@ -796,11 +796,11 @@ function renderFeed() {
   let startY = 0;
   let startX = 0;
 
-  feedGrid.addEventListener('contextmenu', e => {
+  if (feedGrid) feedGrid.addEventListener('contextmenu', e => {
     if (e.target.closest('article[data-id]')) e.preventDefault();
   });
 
-  feedGrid.addEventListener('pointerdown', e => {
+  if (feedGrid) feedGrid.addEventListener('pointerdown', e => {
     const article = e.target.closest('article[data-id]');
     if (!article) return;
     if (e.pointerType === 'mouse' && e.button !== 0) return;
@@ -818,14 +818,14 @@ function renderFeed() {
     }
   });
 
-  feedGrid.addEventListener('pointermove', e => {
+  if (feedGrid) feedGrid.addEventListener('pointermove', e => {
     if (Math.abs(e.clientY - startY) > 10 || Math.abs(e.clientX - startX) > 10) clearTimeout(pressTimer);
   });
 
-  feedGrid.addEventListener('pointerup', () => clearTimeout(pressTimer));
-  feedGrid.addEventListener('pointercancel', () => clearTimeout(pressTimer));
+  if (feedGrid) feedGrid.addEventListener('pointerup', () => clearTimeout(pressTimer));
+  if (feedGrid) feedGrid.addEventListener('pointercancel', () => clearTimeout(pressTimer));
 
-  feedGrid.addEventListener('click', e => {
+  if (feedGrid) feedGrid.addEventListener('click', e => {
     const article = e.target.closest('article[data-id]');
     if (!article) return;
     e.preventDefault();
@@ -1174,8 +1174,8 @@ function closeDetailSheet(fromHistory = false) {
   if (!fromHistory) history.back(); 
 }
 
-detailBackdrop.addEventListener('click', () => closeDetailSheet(false));
-btnSheetClose.addEventListener('click', () => closeDetailSheet(false));
+if (detailBackdrop) detailBackdrop.addEventListener('click', () => closeDetailSheet(false));
+if (btnSheetClose) btnSheetClose.addEventListener('click', () => closeDetailSheet(false));
 
 function openEditTagModal(oldTag) {
   return new Promise((resolve) => {
@@ -1274,11 +1274,11 @@ function startEditMode(id) {
   renderTags();
 }
 
-btnEdit.addEventListener('click', () => {
+if (btnEdit) btnEdit.addEventListener('click', () => {
   if (selectedIds.length === 1) startEditMode(selectedIds[0]);
 });
 
-btnSheetEdit.addEventListener('click', () => {
+if (btnSheetEdit) btnSheetEdit.addEventListener('click', () => {
   if (currentDetailId) startEditMode(currentDetailId);
 });
 
@@ -1310,7 +1310,7 @@ const btnDiscardEntry = document.getElementById('btn-discard-entry');
 const btnToggleList = document.getElementById('btn-toggle-list');
 
 if (btnDiscardEntry) {
-  btnDiscardEntry.addEventListener('click', () => {
+  if (btnDiscardEntry) btnDiscardEntry.addEventListener('click', () => {
     addTitle.value = ''; 
     addDescription.value = ''; 
     addLink.value = ''; 
@@ -1345,7 +1345,7 @@ if (btnDiscardEntry) {
 }
 
 if (btnToggleList) {
-  btnToggleList.addEventListener('click', () => {
+  if (btnToggleList) btnToggleList.addEventListener('click', () => {
     isListMode = !isListMode;
     updateListButtonUI();
   });
@@ -1457,7 +1457,7 @@ function updateListButtonUI() {
 }
 
 if (btnShowAnchor) {
-  btnShowAnchor.addEventListener('click', () => {
+  if (btnShowAnchor) btnShowAnchor.addEventListener('click', () => {
     btnShowAnchor.style.display = 'none';
     anchorContainer.style.display = 'block'; 
     addAnchor.focus();
@@ -1466,7 +1466,7 @@ if (btnShowAnchor) {
 }
 
 if (btnCloseAnchor) {
-  btnCloseAnchor.addEventListener('click', () => {
+  if (btnCloseAnchor) btnCloseAnchor.addEventListener('click', () => {
     anchorContainer.style.display = 'none';
     btnShowAnchor.style.display = 'flex';
     addAnchor.value = '';
@@ -1652,16 +1652,16 @@ function renderTags() {
   }
 }
 
-addTitle.addEventListener('input', (e) => {
+if (addTitle) addTitle.addEventListener('input', (e) => {
   document.getElementById('title-counter').textContent = `${e.target.value.length}/100`;
   renderAddPreview();
 });
 
-addDescription.addEventListener('input', renderAddPreview);
-addLink.addEventListener('input', renderAddPreview);
+if (addDescription) addDescription.addEventListener('input', renderAddPreview);
+if (addLink) addLink.addEventListener('input', renderAddPreview);
 if (addAnchor) addAnchor.addEventListener('input', renderAddPreview);
 
-addImage.addEventListener('input', (e) => {
+if (addImage) addImage.addEventListener('input', (e) => {
   addImageUrl = e.target.value;
   addThumbUrl = addImageUrl; 
   pendingImageFile = null;
@@ -1722,7 +1722,7 @@ function compressImage(file, maxWidth = 1200, quality = 0.8, prefix = "img") {
   });
 }
 
-addImageFile.addEventListener('change', async (e) => {
+if (addImageFile) addImageFile.addEventListener('change', async (e) => {
   const file = e.target.files[0];
   if (file) {
     authOverlay.style.display = 'flex';
@@ -1751,7 +1751,7 @@ addImageFile.addEventListener('change', async (e) => {
   }
 });
 
-btnSaveEntry.addEventListener('click', async () => {
+if (btnSaveEntry) btnSaveEntry.addEventListener('click', async () => {
   if (!addTitle.value.trim()) {
     showToast('Please provide a post title.');
     addTitle.focus();
@@ -1869,9 +1869,9 @@ btnSaveEntry.addEventListener('click', async () => {
   }
 });
 
-renderAddPreview();
-renderTags();
-renderListBuilder();
+if (typeof addTitle !== "undefined" && addTitle) renderAddPreview();
+if (document.getElementById("tags-container")) renderTags();
+if (document.getElementById("add-list-container")) renderListBuilder();
 
 // --- Bind Global Events ---
 window.addEventListener('hashchange', () => handleRoute());
@@ -1906,7 +1906,7 @@ if ('serviceWorker' in navigator) {
   });
 }
 
-btnDelete.addEventListener('click', async () => {
+if (btnDelete) btnDelete.addEventListener('click', async () => {
   const count = selectedIds.length;
   const noun = count === 1 ? 'post' : 'posts';
   const confirmed = await showConfirm(
@@ -1948,13 +1948,13 @@ btnDelete.addEventListener('click', async () => {
   updateSelectionState(true); 
 });
 
-btnCloseSelection.addEventListener('click', () => {
+if (btnCloseSelection) btnCloseSelection.addEventListener('click', () => {
   selectedIds = [];
   updateSelectionState(); 
 });
 
 if (btnDeleteTag) {
-  btnDeleteTag.addEventListener('click', async () => {
+  if (btnDeleteTag) btnDeleteTag.addEventListener('click', async () => {
     authOverlay.style.display = 'flex';
     authStatus.textContent = 'Deleting tags...';
     authStatus.style.display = 'block';
@@ -1987,7 +1987,7 @@ if (btnDeleteTag) {
 }
 
 if (btnEditTag) {
-  btnEditTag.addEventListener('click', async () => {
+  if (btnEditTag) btnEditTag.addEventListener('click', async () => {
     if (selectedTags.length !== 1) return;
     const oldTag = selectedTags[0];
     
@@ -2037,13 +2037,13 @@ if (btnEditTag) {
 }
 
 if (btnCloseTagSelection) {
-  btnCloseTagSelection.addEventListener('click', () => {
+  if (btnCloseTagSelection) btnCloseTagSelection.addEventListener('click', () => {
     selectedTags = [];
     updateTagSelectionState(); 
   });
 }
 
-document.getElementById('btn-logout').addEventListener('click', () => {
+const btnLogout = document.getElementById('btn-logout'); if (btnLogout) btnLogout.addEventListener('click', () => {
   localStorage.removeItem('onespot_dbx_refresh');
   window.location.hash = '#/';
   window.location.reload();
@@ -2055,12 +2055,12 @@ document.getElementById('btn-logout').addEventListener('click', () => {
   let touchCurrentY = 0;
   let isDragging = false;
 
-  detailSheet.addEventListener('touchstart', e => {
+  if (detailSheet) detailSheet.addEventListener('touchstart', e => {
     touchStartY = e.touches[0].clientY;
     isDragging = true;
   }, { passive: true });
 
-  detailSheet.addEventListener('touchmove', e => {
+  if (detailSheet) detailSheet.addEventListener('touchmove', e => {
     if (!isDragging) return;
     touchCurrentY = e.touches[0].clientY;
     const delta = touchCurrentY - touchStartY;
@@ -2070,7 +2070,7 @@ document.getElementById('btn-logout').addEventListener('click', () => {
     }
   }, { passive: true });
 
-  detailSheet.addEventListener('touchend', () => {
+  if (detailSheet) detailSheet.addEventListener('touchend', () => {
     if (!isDragging) return;
     isDragging = false;
     const delta = touchCurrentY - touchStartY;
