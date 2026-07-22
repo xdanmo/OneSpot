@@ -1,4 +1,4 @@
-const CACHE_NAME = 'onespot-cache-v16'; // Bumped: fix nav indicator on load
+const CACHE_NAME = 'onespot-cache-v17'; // Bumped: fix feed visibility on load
 const urlsToCache = [
   './',
   './index.html',

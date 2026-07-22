@@ -263,12 +263,11 @@ window.onload = async function () {
         window.location.href = 'login.html';
         return;
       }
-      if (resetAuthUI) resetAuthUI();
+      if (typeof resetAuthUI === 'function') resetAuthUI();
     }
   }
 
-  setTimeout(() => handleRoute(true), 150);
-  setTimeout(() => handleRoute(true), 500); 
+  handleRoute(true);
 };
 
 function resetAuthUI() {
@@ -343,6 +342,7 @@ async function initializeDropbox() {
   authOverlay.style.display = 'none';
   // Cache entries for offline viewing
   try { localStorage.setItem('onespot_cached_entries', JSON.stringify(entries)); } catch(_) {}
+  handleRoute(true);
   renderFeed();
 }
 
