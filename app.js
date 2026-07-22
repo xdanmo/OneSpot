@@ -2045,8 +2045,7 @@ if (btnCloseTagSelection) {
 
 const btnLogout = document.getElementById('btn-logout'); if (btnLogout) btnLogout.addEventListener('click', () => {
   localStorage.removeItem('onespot_dbx_refresh');
-  window.location.hash = '#/';
-  window.location.reload();
+  window.location.href = 'login.html';
 });
 
 // ─── Swipe-to-Dismiss Detail Sheet ────────────────────────────────────────────
