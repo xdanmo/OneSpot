@@ -1877,6 +1877,8 @@ renderTags();
 renderListBuilder();
 
 // --- Bind Global Events ---
+window.addEventListener('hashchange', () => handleRoute());
+
 let lastWindowWidth = window.innerWidth;
 let resizeTimer;
 window.addEventListener('resize', () => {
@@ -2069,60 +2071,189 @@ document.getElementById('btn-logout').addEventListener('click', () => {
   });
 })();
 
-// ─── Pull-to-Refresh on Home Feed ─────────────────────────────────────────────
+// ─── Refresh Feed & Pull-to-Refresh ──────────────────────────────────────────
+async function triggerFeedRefresh() {
+  const pullIndicator = document.getElementById('pull-indicator');
+  const pullArrow = pullIndicator ? pullIndicator.querySelector('.pull-arrow') : null;
+  if (!pullIndicator) return;
+
+  pullIndicator.classList.add('active');
+  if (pullArrow) pullArrow.style.display = 'none';
+
+  let spinner = pullIndicator.querySelector('.pull-spinner');
+  if (!spinner) {
+    spinner = document.createElement('div');
+    spinner.className = 'pull-spinner';
+    pullIndicator.insertBefore(spinner, pullIndicator.children[1] || null);
+  }
+  const textSpan = pullIndicator.querySelector('span');
+  if (textSpan) textSpan.textContent = 'Refreshing...';
+
+  try {
+    if (dbx) {
+      await initializeDropbox();
+    } else {
+      renderFeed();
+    }
+    showToast('Feed refreshed');
+  } catch(e) {
+    showToast('Failed to refresh feed');
+  } finally {
+    setTimeout(() => {
+      pullIndicator.classList.remove('active');
+      if (pullArrow) { pullArrow.style.display = ''; pullArrow.style.transform = ''; }
+      if (textSpan) textSpan.textContent = 'Pull to refresh';
+      if (spinner) spinner.remove();
+    }, 400);
+  }
+}
+
 (function() {
   const homeView = document.getElementById('view-home');
   const pullIndicator = document.getElementById('pull-indicator');
-  const pullArrow = pullIndicator ? pullIndicator.querySelector('.pull-arrow') : null;
+  const btnRefreshFeed = document.getElementById('btn-refresh-feed');
+  const navHomeLink = document.querySelector('.nav-link[data-index="0"]');
+
   if (!homeView || !pullIndicator) return;
+
+  const pullArrow = pullIndicator.querySelector('.pull-arrow');
+  const textSpan = pullIndicator.querySelector('span');
+
+  // CRITICAL FIX: Check actual page scroll position (window.scrollY) instead of homeView.scrollTop (which is always 0)
+  const getScrollTop = () => window.scrollY || window.pageYOffset || document.documentElement.scrollTop || 0;
 
   let startY = 0;
   let isPulling = false;
   let refreshTriggered = false;
 
-  homeView.addEventListener('touchstart', e => {
-    if (homeView.scrollTop <= 0) {
-      startY = e.touches[0].clientY;
+  const startPull = (clientY) => {
+    // Only allow pull-to-refresh if scroll position is at the very top of the page (scrollY === 0)
+    if (getScrollTop() <= 0) {
+      startY = clientY;
       isPulling = true;
       refreshTriggered = false;
+    } else {
+      isPulling = false;
+    }
+  };
+
+  const movePull = (clientY) => {
+    if (!isPulling) return;
+
+    // If user scrolled down the page, cancel pulling immediately!
+    if (getScrollTop() > 0) {
+      isPulling = false;
+      pullIndicator.classList.remove('active');
+      if (pullArrow) pullArrow.style.transform = '';
+      return;
+    }
+
+    const delta = clientY - startY;
+    if (delta > 10) {
+      pullIndicator.classList.add('active');
+      if (pullArrow) pullArrow.style.transform = `rotate(${Math.min(delta * 2, 180)}deg)`;
+
+      if (delta > 70 && !refreshTriggered) {
+        refreshTriggered = true;
+        if (pullArrow) pullArrow.style.display = 'none';
+        let spinner = pullIndicator.querySelector('.pull-spinner');
+        if (!spinner) {
+          spinner = document.createElement('div');
+          spinner.className = 'pull-spinner';
+          pullIndicator.insertBefore(spinner, pullIndicator.children[1] || null);
+        }
+        if (textSpan) textSpan.textContent = 'Refreshing...';
+      }
+    } else if (delta <= 0) {
+      pullIndicator.classList.remove('active');
+    }
+  };
+
+  const endPull = async () => {
+    if (!isPulling) return;
+    isPulling = false;
+
+    if (refreshTriggered) {
+      if (dbx) {
+        try {
+          await initializeDropbox();
+          showToast('Feed refreshed');
+        } catch(e) { /* silent */ }
+      } else {
+        renderFeed();
+      }
+    }
+
+    pullIndicator.classList.remove('active');
+    if (pullArrow) { pullArrow.style.display = ''; pullArrow.style.transform = ''; }
+    if (textSpan) textSpan.textContent = 'Pull to refresh';
+    const spinner = pullIndicator.querySelector('.pull-spinner');
+    if (spinner) spinner.remove();
+  };
+
+  // Touch Events (Mobile)
+  homeView.addEventListener('touchstart', e => {
+    if (e.touches && e.touches.length === 1) {
+      startPull(e.touches[0].clientY);
     }
   }, { passive: true });
 
   homeView.addEventListener('touchmove', e => {
-    if (!isPulling) return;
-    const delta = e.touches[0].clientY - startY;
-    if (delta > 10 && homeView.scrollTop <= 0) {
-      pullIndicator.classList.add('active');
-      if (pullArrow) pullArrow.style.transform = `rotate(${Math.min(delta * 2, 180)}deg)`;
-      if (delta > 70 && !refreshTriggered) {
-        refreshTriggered = true;
-        // Show spinner instead of arrow
-        if (pullArrow) {
-          pullArrow.style.display = 'none';
-          const spinner = document.createElement('div');
-          spinner.className = 'pull-spinner';
-          pullIndicator.insertBefore(spinner, pullIndicator.children[1]);
-        }
-        pullIndicator.querySelector('span').textContent = 'Refreshing...';
-      }
+    if (e.touches && e.touches.length === 1) {
+      movePull(e.touches[0].clientY);
     }
   }, { passive: true });
 
-  homeView.addEventListener('touchend', async () => {
-    if (!isPulling) return;
-    isPulling = false;
-    if (refreshTriggered && dbx) {
-      try {
-        await initializeDropbox();
-      } catch(e) { /* silent */ }
+  homeView.addEventListener('touchend', endPull, { passive: true });
+  homeView.addEventListener('touchcancel', endPull, { passive: true });
+
+  // Pointer / Mouse Drag Events (Desktop)
+  let isPointerDown = false;
+  homeView.addEventListener('pointerdown', e => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    if (getScrollTop() <= 0) {
+      isPointerDown = true;
+      startPull(e.clientY);
     }
-    // Reset indicator
-    pullIndicator.classList.remove('active');
-    if (pullArrow) { pullArrow.style.display = ''; pullArrow.style.transform = ''; }
-    pullIndicator.querySelector('span').textContent = 'Pull to refresh';
-    const spinner = pullIndicator.querySelector('.pull-spinner');
-    if (spinner) spinner.remove();
   });
+
+  window.addEventListener('pointermove', e => {
+    if (isPointerDown) {
+      movePull(e.clientY);
+    }
+  });
+
+  window.addEventListener('pointerup', () => {
+    if (isPointerDown) {
+      isPointerDown = false;
+      endPull();
+    }
+  });
+
+  // Explicit Refresh triggers (Desktop & Mobile 1-Click Refresh)
+  if (pullIndicator) {
+    pullIndicator.addEventListener('click', () => {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      triggerFeedRefresh();
+    });
+  }
+
+  if (btnRefreshFeed) {
+    btnRefreshFeed.addEventListener('click', () => {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      triggerFeedRefresh();
+    });
+  }
+
+  if (navHomeLink) {
+    navHomeLink.addEventListener('click', () => {
+      const currentHash = window.location.hash.replace('#', '') || '/';
+      if (currentHash === '/') {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        triggerFeedRefresh();
+      }
+    });
+  }
 })();
 
 // ─── Offline Post Queue: Auto-sync when back online ─────────────────────────

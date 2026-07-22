@@ -361,6 +361,9 @@ input, textarea { font-family: inherit; }
   transition: height 0.2s ease;
   color: var(--on-surface-variant);
   font-size: 13px;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
 }
 #pull-indicator.active {
   height: 44px;
@@ -919,7 +922,7 @@ input, textarea { font-family: inherit; }
   background-color: var(--surface-container-low);
   border: 1px solid var(--outline-variant);
   border-radius: var(--rounded-full);
-  padding: 14px 16px 14px 48px;
+  padding: 14px 48px 14px 48px;
   color: var(--on-surface);
   outline: none;
   transition: all 0.2s;
