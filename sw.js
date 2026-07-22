@@ -1,4 +1,4 @@
-const CACHE_NAME = 'onespot-cache-v11'; // Bumped: fix scroll lockout from overscroll-behavior
+const CACHE_NAME = 'onespot-cache-v12'; // Bumped: touch hover fix for refresh button
 const urlsToCache = [
   './',
   './index.html',

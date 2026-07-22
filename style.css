@@ -585,7 +585,6 @@ input, textarea { font-family: inherit; }
   word-break: break-all;
 }
 
-/* ─── Inset Buttons (inside textareas) ───────────────────────────────────── */
 .btn-inset {
   position: absolute;
   right: 8px;
@@ -605,10 +604,22 @@ input, textarea { font-family: inherit; }
   outline: none;
   -webkit-tap-highlight-color: transparent;
 }
-.btn-inset:focus { outline: none; }
-.btn-inset:hover {
-  background-color: var(--surface-variant);
-  color: var(--on-surface);
+.btn-inset:focus,
+.btn-inset:focus-visible,
+.btn-inset:active {
+  outline: none !important;
+  background-color: transparent;
+  box-shadow: none;
+}
+@media (hover: hover) and (pointer: fine) {
+  .btn-inset:hover {
+    background-color: var(--surface-variant);
+    color: var(--on-surface);
+  }
+}
+
+.spin-icon {
+  animation: spin 0.7s linear infinite;
 }
 
 /* ─── Action Buttons ─────────────────────────────────────────────────────── */

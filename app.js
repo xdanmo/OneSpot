@@ -2064,19 +2064,25 @@ document.getElementById('btn-logout').addEventListener('click', () => {
 async function triggerFeedRefresh() {
   const pullIndicator = document.getElementById('pull-indicator');
   const pullArrow = pullIndicator ? pullIndicator.querySelector('.pull-arrow') : null;
-  if (!pullIndicator) return;
+  const btnRefreshFeed = document.getElementById('btn-refresh-feed');
+  const refreshIcon = btnRefreshFeed ? btnRefreshFeed.querySelector('.material-symbols-outlined') : null;
 
-  pullIndicator.classList.add('active');
-  if (pullArrow) pullArrow.style.display = 'none';
+  if (btnRefreshFeed) btnRefreshFeed.blur();
+  if (refreshIcon) refreshIcon.classList.add('spin-icon');
 
-  let spinner = pullIndicator.querySelector('.pull-spinner');
-  if (!spinner) {
-    spinner = document.createElement('div');
-    spinner.className = 'pull-spinner';
-    pullIndicator.insertBefore(spinner, pullIndicator.children[1] || null);
+  if (pullIndicator) {
+    pullIndicator.classList.add('active');
+    if (pullArrow) pullArrow.style.display = 'none';
+
+    let spinner = pullIndicator.querySelector('.pull-spinner');
+    if (!spinner) {
+      spinner = document.createElement('div');
+      spinner.className = 'pull-spinner';
+      pullIndicator.insertBefore(spinner, pullIndicator.children[1] || null);
+    }
+    const textSpan = pullIndicator.querySelector('span');
+    if (textSpan) textSpan.textContent = 'Refreshing...';
   }
-  const textSpan = pullIndicator.querySelector('span');
-  if (textSpan) textSpan.textContent = 'Refreshing...';
 
   try {
     if (dbx) {
@@ -2088,12 +2094,17 @@ async function triggerFeedRefresh() {
   } catch(e) {
     showToast('Failed to refresh feed');
   } finally {
-    setTimeout(() => {
-      pullIndicator.classList.remove('active');
-      if (pullArrow) { pullArrow.style.display = ''; pullArrow.style.transform = ''; }
-      if (textSpan) textSpan.textContent = 'Pull to refresh';
-      if (spinner) spinner.remove();
-    }, 400);
+    if (refreshIcon) refreshIcon.classList.remove('spin-icon');
+    if (pullIndicator) {
+      setTimeout(() => {
+        pullIndicator.classList.remove('active');
+        if (pullArrow) { pullArrow.style.display = ''; pullArrow.style.transform = ''; }
+        const textSpan = pullIndicator.querySelector('span');
+        if (textSpan) textSpan.textContent = 'Pull to refresh';
+        const spinner = pullIndicator.querySelector('.pull-spinner');
+        if (spinner) spinner.remove();
+      }, 400);
+    }
   }
 }
 
