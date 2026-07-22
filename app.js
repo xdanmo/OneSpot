@@ -194,7 +194,7 @@ window.onload = async function () {
   handleRoute(true);
   if (window.location.protocol === 'file:') {
     if (authStatus) authStatus.style.display = 'block';
-    authStatus.textContent = 'This app needs to be served over http/https, not opened directly as a file. Run it through a local server or deploy it, then reload this page.';
+    if (authStatus) authStatus.textContent = 'This app needs to be served over http/https, not opened directly as a file. Run it through a local server or deploy it, then reload this page.';
     if (btnLogin) btnLogin.style.display = 'none';
     if (authOverlay) authOverlay.style.display = 'flex';
     return;
@@ -222,7 +222,7 @@ window.onload = async function () {
   if (code) {
     if (authOverlay) authOverlay.style.display = 'flex';
     if (authStatus) authStatus.style.display = 'block';
-    authStatus.textContent = 'Completing login...';
+    if (authStatus) authStatus.textContent = 'Completing login...';
     if (btnLogin) btnLogin.style.display = 'none';
 
     try {
@@ -289,7 +289,7 @@ if (btnLogin) {
 
 async function initializeDropbox() {
   if (authStatus) authStatus.style.display = 'block';
-  if (authStatus) authStatus.textContent = 'Syncing with Dropbox...';
+  if (authStatus) if (authStatus) authStatus.textContent = 'Syncing with Dropbox...';
   if (btnLogin) btnLogin.style.display = 'none';
   if (authOverlay) authOverlay.style.display = 'flex';
 
@@ -387,7 +387,7 @@ async function saveDataToDropbox(retrying = false) {
 
 async function uploadImageToDropbox(file) {
   if (authOverlay) authOverlay.style.display = 'flex';
-  authStatus.textContent = 'Uploading image...';
+  if (authStatus) authStatus.textContent = 'Uploading image...';
   if (authStatus) authStatus.style.display = 'block';
   await dbxAuth.checkAndRefreshAccessToken();
 
@@ -1187,7 +1187,6 @@ function openEditTagModal(oldTag) {
     tagEditModal.style.opacity = '1';
     
     setTimeout(() => { 
-      tagEditInput.focus(); 
       tagEditInput.select(); 
     }, 100);
 
@@ -1381,8 +1380,6 @@ function renderListBuilder() {
         if (index === currentListItems.length - 1) {
           row.querySelector('button').click();
         } else {
-          const allInputs = addListContainer.querySelectorAll('textarea');
-          if (allInputs[index + 1]) allInputs[index + 1].focus();
         }
       }
     });
@@ -1412,7 +1409,6 @@ function renderListBuilder() {
           const inputs = addListContainer.querySelectorAll('textarea');
           if (inputs.length > 0) {
             const lastInput = inputs[inputs.length - 1];
-            lastInput.focus();
             lastInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
           }
         }, 50);
@@ -1461,7 +1457,6 @@ if (btnShowAnchor) {
   if (btnShowAnchor) btnShowAnchor.addEventListener('click', () => {
     btnShowAnchor.style.display = 'none';
     anchorContainer.style.display = 'block'; 
-    addAnchor.focus();
     autoExpand(addAnchor);
   });
 }
@@ -1630,7 +1625,6 @@ function renderTags() {
       };
       input.onblur = saveTag;
       tagsContainer.appendChild(input);
-      input.focus();
     } else {
       const btn = document.createElement('button');
       btn.className = 'font-label-sm';
@@ -1727,7 +1721,7 @@ if (addImageFile) addImageFile.addEventListener('change', async (e) => {
   const file = e.target.files[0];
   if (file) {
     if (authOverlay) authOverlay.style.display = 'flex';
-    authStatus.textContent = 'Optimizing images...';
+    if (authStatus) authStatus.textContent = 'Optimizing images...';
     if (authStatus) authStatus.style.display = 'block';
 
     try {
@@ -1755,7 +1749,6 @@ if (addImageFile) addImageFile.addEventListener('change', async (e) => {
 if (btnSaveEntry) btnSaveEntry.addEventListener('click', async () => {
   if (!addTitle.value.trim()) {
     showToast('Please provide a post title.');
-    addTitle.focus();
     return;
   }
 
@@ -1926,7 +1919,7 @@ if (btnDelete) btnDelete.addEventListener('click', async () => {
   });
 
   if (authOverlay) authOverlay.style.display = 'flex';
-  authStatus.textContent = 'Deleting...';
+  if (authStatus) authStatus.textContent = 'Deleting...';
   if (authStatus) authStatus.style.display = 'block';
 
   entries = entries.filter(e => !selectedIds.includes(e.id));
@@ -1957,7 +1950,7 @@ if (btnCloseSelection) btnCloseSelection.addEventListener('click', () => {
 if (btnDeleteTag) {
   if (btnDeleteTag) btnDeleteTag.addEventListener('click', async () => {
     if (authOverlay) authOverlay.style.display = 'flex';
-    authStatus.textContent = 'Deleting tags...';
+    if (authStatus) authStatus.textContent = 'Deleting tags...';
     if (authStatus) authStatus.style.display = 'block';
 
     entries.forEach(entry => {
@@ -2003,7 +1996,7 @@ if (btnEditTag) {
     const trimmedNewTag = newTag.trim();
 
     if (authOverlay) authOverlay.style.display = 'flex';
-    authStatus.textContent = 'Updating tag...';
+    if (authStatus) authStatus.textContent = 'Updating tag...';
     if (authStatus) authStatus.style.display = 'block';
 
     entries.forEach(entry => {
