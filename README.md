@@ -30,14 +30,18 @@ Because OneSpot is a purely client-side application, it requires zero backend se
 
 ## 📥 Local Development
 
-To run this project locally:
-1. Clone the repository.
-2. Because the application uses ES6 modules and the Dropbox API, it must be served over `http://` or `https://` (it will not work via `file://`).
-3. You can use any local web server. For example, if you have Python installed, simply run:
+To run this project locally, you will need to use your own Dropbox App Key, as the default key is restricted to the live production URL.
+
+1. Go to the [Dropbox App Console](https://www.dropbox.com/developers/apps) and create a new app (Scoped Access, App folder).
+2. Add `http://localhost:8000` to your OAuth 2 Redirect URIs.
+3. Open `app.js` and `login.html` and replace `CLIENT_ID` with your new App Key.
+4. Clone the repository.
+5. Because the application uses ES6 modules and the Dropbox API, it must be served over `http://` or `https://` (it will not work via `file://`).
+6. You can use any local web server. For example, if you have Python installed, simply run:
    ```bash
    python -m http.server 8000
    ```
-4. Open `http://localhost:8000` in your browser.
+7. Open `http://localhost:8000` in your browser.
 
 ## 🛡 Privacy
 
