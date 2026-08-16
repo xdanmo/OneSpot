@@ -1,5 +1,7 @@
 # OneSpot
 
+*A fast, decentralized web vault built entirely via "vibe coding" using Gemini 3.1 Pro / 3.5 Flash and Claude Opus 4.6.*
+
 **OneSpot** is a lightning-fast, privacy-first, serverless Progressive Web Application (PWA) designed to be your personal vault for links, notes, to-do lists, and images. 
 
 Instead of relying on a centralized database, OneSpot connects directly to your **Dropbox** account. All of your data—from your notes to your optimized images—lives entirely under your control on your own Dropbox storage. There are no backend servers, no hidden tracking, and no proprietary databases. You truly own your data.
